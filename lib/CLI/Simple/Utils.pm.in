@@ -170,5 +170,7 @@ L<https://dev.perl.org/licenses/> for more information.
 Rob Lauer - <bigfoot@cpan.org>
 
 =head1 SEE ALSO
- 
+
+L<CLI::Simple>
+
 =cut

@@ -2317,8 +2317,8 @@ L<https://dev.perl.org/licenses/> for more information.
 
 =head1 SEE ALSO
 
-L<Getopt::Long>, L<CLI::Simple::Utils>, L<Pod::Usage>, L<App::Cmd>,
-L<CLI::Framework>, L<Role::Tiny>,
+L<Getopt::Long>, L<CLI::Simple::Constants>, L<CLI::Simple::Utils>,
+L<Pod::Usage>, L<App::Cmd>, L<CLI::Framework>, L<Role::Tiny>,
 L<CPAN::Maker::Bootstrapper>
 
 =head1 AUTHOR
