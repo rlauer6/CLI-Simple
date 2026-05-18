@@ -104,7 +104,7 @@ MODULINO_WRAPPER=$MODULINO_WRAPPER perl $MODULE_PATH "$@"
 
 =head1 NAME
 
-CLI::Simple::Modulino
+CLI::Simple::Modulino - Create CLI wrapper around a modulino
 
 =head1 SYNOPSIS
 
