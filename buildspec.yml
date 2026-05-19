@@ -16,6 +16,8 @@ path:
 extra-files:
   - ChangeLog
   - README.md
+man-links:
+  - cli-simple: CLI::Simple::Shell
 provides:
   - CLI::Simple::Constants
   - CLI::Simple::Utils
@@ -23,6 +25,7 @@ provides:
   - CLI::Simple::DumpSpec
   - CLI::Simple::Migrate
   - CLI::Simple::Scaffold
+  - CLI::Simple::Shell
 resources:
   homepage: http://github.com/rlauer6/CLI-Simple
   bugtracker:

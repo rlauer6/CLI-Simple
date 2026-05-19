@@ -10,6 +10,7 @@ use CLI::Simple::DumpSpec qw(_cmd_dump_spec);
 use CLI::Simple::Migrate qw(_cmd_migrate);
 use CLI::Simple::Scaffold qw(_cmd_scaffold);
 use CLI::Simple::Helpers qw(_is_class_name);
+use CLI::Simple::Shell;
 
 use Carp;
 use Data::Dumper;
@@ -503,10 +504,12 @@ sub usage {
 ########################################################################
   my ($self) = @_;
 
+  my $input = $ENV{MODULINO_WRAPPER} eq 'cli-simple' ? $INC{'CLI/Simple/Shell.pm'} : $self->get__program;
+
   pod2usage(
     -noperldoc => 1,
     -exitval   => 'NOEXIT',
-    -input     => $self->get__program
+    -input     => $input,
   );
 
   return _leave($FAILURE);
@@ -2299,15 +2302,6 @@ returns a numeric value other than 0 - 2, that code is passed through
 unchanged to the shell. This allows application-specific exit codes.
 
 =back
-
-=head1 EXAMPLE
-
-Run the shell script that comes with the distribution to output a
-working example:
-
-  cli-simple-example > example.pl
-
-For a role-based example, see L</QUICK START>.
 
 =head1 LICENSE AND COPYRIGHT
 

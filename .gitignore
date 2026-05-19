@@ -18,6 +18,5 @@ resources
 *-review-2*.code
 *-review-2*.pod
 *-review-2*.annotate
-bin/bootstrapper
-bin/cpan-maker-bootstrapper
+bin/cli-simple
 

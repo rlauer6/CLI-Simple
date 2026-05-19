@@ -62,7 +62,6 @@
   * [Recommendations](#recommendations)
 * [ERRORS/EXIT CODES](#errorsexit-codes)
   * [Exit Codes](#exit-codes)
-* [EXAMPLE](#example)
 * [LICENSE AND COPYRIGHT](#license-and-copyright)
 * [SEE ALSO](#see-also)
 * [AUTHOR](#author)
@@ -198,7 +197,7 @@ distribution in one step.
 
 # VERSION
 
-This documentation refers to version 2.0.1.
+This documentation refers to version 2.0.2.
 
 # FEATURES
 
@@ -1494,15 +1493,6 @@ can distinguish between normal completion and error conditions.
     returns a numeric value other than 0 - 2, that code is passed through
     unchanged to the shell. This allows application-specific exit codes.
 
-# EXAMPLE
-
-Run the shell script that comes with the distribution to output a
-working example:
-
-    cli-simple-example > example.pl
-
-For a role-based example, see ["QUICK START"](#quick-start).
-
 # LICENSE AND COPYRIGHT
 
 This module is free software; you can redistribute it and/or modify it
@@ -1511,8 +1501,8 @@ under the same terms as Perl itself.  See
 
 # SEE ALSO
 
-[Getopt::Long](https://metacpan.org/pod/Getopt%3A%3ALong), [CLI::Simple::Utils](https://metacpan.org/pod/CLI%3A%3ASimple%3A%3AUtils), [Pod::Usage](https://metacpan.org/pod/Pod%3A%3AUsage), [App::Cmd](https://metacpan.org/pod/App%3A%3ACmd),
-[CLI::Framework](https://metacpan.org/pod/CLI%3A%3AFramework), [Role::Tiny](https://metacpan.org/pod/Role%3A%3ATiny),
+[Getopt::Long](https://metacpan.org/pod/Getopt%3A%3ALong), [CLI::Simple::Constants](https://metacpan.org/pod/CLI%3A%3ASimple%3A%3AConstants), [CLI::Simple::Utils](https://metacpan.org/pod/CLI%3A%3ASimple%3A%3AUtils),
+[Pod::Usage](https://metacpan.org/pod/Pod%3A%3AUsage), [App::Cmd](https://metacpan.org/pod/App%3A%3ACmd), [CLI::Framework](https://metacpan.org/pod/CLI%3A%3AFramework), [Role::Tiny](https://metacpan.org/pod/Role%3A%3ATiny),
 [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper)
 
 # AUTHOR
