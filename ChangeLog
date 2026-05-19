@@ -1,3 +1,16 @@
+Tue May 19 14:51:05 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.0.2]:
+	* bin/cli-simple.in: renamed from .in.sh
+	* lib/CLI/Simple/Shell.pm.in: new
+	* lib/CLI/Simple.pm.in
+	(usage)
+	- display shell usage if cli-simple
+	* .gitignore: add bin/cli-simple
+	* README.md: generated
+	* VERSION: bump
+	* buildspec.yml: man link for cli-simple
+
 Mon May  4 13:54:48 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.0.1]:
