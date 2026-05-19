@@ -104,7 +104,7 @@ MODULINO_WRAPPER=$MODULINO_WRAPPER perl $MODULE_PATH "$@"
 
 =head1 NAME
 
-CLI::Simple::Modulino
+CLI::Simple::Modulino - Create CLI wrapper around a modulino
 
 =head1 SYNOPSIS
 
@@ -121,10 +121,10 @@ CLI::Simple::Modulino
 
 =head2 Options
 
--h, --help            help
--a, --alias           name of the modulino (default: lower cased snake cased module name)
--m, --module          module name - Perl module implementing the modulino
--i, --installbindir   executable directory
+ -h, --help            help
+ -a, --alias           name of the modulino (default: lower cased snake cased module name)
+ -m, --module          module name - Perl module implementing the modulino
+ -i, --installbindir   executable directory
 
 Example:
 
