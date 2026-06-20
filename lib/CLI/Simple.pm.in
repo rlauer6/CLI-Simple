@@ -504,7 +504,7 @@ sub usage {
 ########################################################################
   my ($self) = @_;
 
-  my $input = $ENV{MODULINO_WRAPPER} eq 'cli-simple' ? $INC{'CLI/Simple/Shell.pm'} : $self->get__program;
+  my $input = $ENV{MODULINO_WRAPPER} // '' eq 'cli-simple' ? $INC{'CLI/Simple/Shell.pm'} : $self->get__program;
 
   pod2usage(
     -noperldoc => 1,
