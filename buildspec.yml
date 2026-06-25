@@ -20,12 +20,13 @@ man-links:
   - cli-simple: CLI::Simple::Shell
 provides:
   - CLI::Simple::Constants
-  - CLI::Simple::Utils
-  - CLI::Simple::Helpers
   - CLI::Simple::DumpSpec
+  - CLI::Simple::Helpers
   - CLI::Simple::Migrate
+  - CLI::Simple::Modulino
   - CLI::Simple::Scaffold
   - CLI::Simple::Shell
+  - CLI::Simple::Utils
 resources:
   homepage: http://github.com/rlauer6/CLI-Simple
   bugtracker:

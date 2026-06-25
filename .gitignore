@@ -20,3 +20,4 @@ resources
 *-review-2*.annotate
 bin/cli-simple
 
+bin/create-modulino
