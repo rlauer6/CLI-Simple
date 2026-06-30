@@ -1,3 +1,14 @@
+Tue Jun 30 09:26:00 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.0.8]:
+	* VERSION: bump
+	* README.md: generated
+	* release-notes.md: updated
+	* release-notes/release-notes-2.0.7.md: new
+	* lib/CLI/Simple/Modulino.pm.in
+	(create_modulino)
+	- default install directory = PERL_LOCAL_LIB_ROOT/bin or installsitebin
+
 Mon Jun 29 12:29:27 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.0.7]:
