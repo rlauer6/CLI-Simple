@@ -1,3 +1,10 @@
+Sun Jul  5 06:16:50 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.0.10]:
+	* VERSION: modified
+	* lib/CLI/Simple.pm.in
+	- remove use IO::Pager
+
 Sat Jul  4 15:33:47 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.0.9]:
