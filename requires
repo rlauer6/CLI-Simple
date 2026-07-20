@@ -2,6 +2,7 @@
 Class::Accessor::Fast 0.51
 File::ShareDir 1.118
 File::Which 1.23
+IO::Interactive 1.027
 JSON 4.07
 Log::Log4perl 1.57
 Log::Log4perl::Level 0

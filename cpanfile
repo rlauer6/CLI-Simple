@@ -1,6 +1,7 @@
 requires "Class::Accessor::Fast", "0.51";
 requires "File::ShareDir", "1.118";
 requires "File::Which", "1.23";
+requires "IO::Interactive", "1.027";
 requires "JSON", "4.07";
 requires "List::Util", "1.56";
 requires "Log::Log4perl", "1.57";
