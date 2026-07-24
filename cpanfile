@@ -4,8 +4,6 @@ requires "File::Which", "1.23";
 requires "IO::Interactive", "1.027";
 requires "JSON", "4.07";
 requires "List::Util", "1.56";
-requires "Log::Log4perl", "1.57";
-requires "Log::Log4perl::Level", "0";
 requires "Readonly", "2.05";
 requires "Role::Tiny", "0";
 requires "Role::Tiny", "2.002004";

@@ -1,3 +1,44 @@
+Fri Jul 24 13:39:27 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.1.2]:
+	* build-requires: new
+	* .gitignore
+	- +*.checked, *.raw, *.tdy, test.t.tmpl, module.pm.tmp, builspec.yml.tmpl
+	* .includes/perl.mk: updated by CPAN::Maker::Bootstrapper
+	* .includes/release-notes.mk: likewise
+	* .includes/update.mk: likewise
+	* ChangeLog: modified
+	* Makefile: likewise
+	* README.md: generated
+	* VERSION: bump
+	* cpanfile
+	- Log::Log4perl, -Log::Log4perl::Level
+	* lib/CLI/Simple.pm.in
+	- track generated accessors vs hand-rolled
+	- lazy load Log::Log4perl, Pod::Usage
+	(use_log4perl)
+	- support for configuring log level colors
+	- lazy load Log::Log4perl
+	- setup log level colors
+	(new): error out if duplicate getter/setters
+	(_set_color_config): new
+	(init_logger)
+	- check if can get_log4perl_conf
+	- set the color config if no config && color
+	- set color off if someone tried to use color but does not have Log::Log4perl
+	(usage)
+	- lazy load Pod::Usage
+	- use full class name since we don't import pod2usage
+	* lib/CLI/Simple/Constants.pm.in
+	- use a sprintf pattern for the ScreenColoredLevels config
+	- hard code Log4perl log levels (avoid Log::Log4perl::Level loading)
+	- export log level colors and config as :color-config
+	* project.mk
+	(install): new
+	* recommends: moved IO::Pager, Tern::ANSIColor to suggests
+	* suggests: what he said above
+	* requires:  -Log::Log4perl, -Log::Log4perl::Level
+
 Mon Jul 20 07:07:38 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.1.1]:

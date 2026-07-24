@@ -21,3 +21,10 @@ resources
 bin/cli-simple
 
 bin/create-modulino
+**/*.checked
+**/*.raw
+**/*.tdy
+buildspec.yml.current
+buildspec.yml.tmpl
+module.pm.tmpl
+test.t.tmpl
