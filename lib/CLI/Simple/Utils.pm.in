@@ -260,7 +260,12 @@ Returns a Perl object from a presumably JSON encoded file.
 
  slurp(file)
 
-Return the entire contents of a file.
+Return the entire contents of a file. C<file> can be the path to a
+file or an open file handle.
+
+=head1 VERSION
+
+This documentation referes to version @PACKAGE_VERSION@
 
 =head1 LICENSE AND COPYRIGHT
 

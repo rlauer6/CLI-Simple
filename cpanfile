@@ -10,3 +10,6 @@ requires "Role::Tiny", "2.002004";
 requires "Test::Exit", "0.11";
 requires "Test::Output", "1.036";
 requires "YAML::Tiny", "1.76";
+suggests "IO::Pager", "2.10";
+suggests "Log::Log4perl", "1.57";
+suggests "Perl::Tidy", "20260204";

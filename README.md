@@ -234,7 +234,7 @@ from your manifest. Feed the resulting tarball to
 <a href="https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper" rel="nofollow">CPAN::Maker::Bootstrapper</a> and you have a complete, buildable CPAN
 distribution in one step.</p>
 <a id="version" class="anchor" aria-label="Permalink: VERSION" href="#version"><span aria-hidden="true" class="octicon octicon-link"></span></a><h1 class="heading-element">VERSION</h1>
-<p>This documentation refers to version 2.1.2.</p>
+<p>This documentation refers to version 2.1.3.</p>
 <a id="features" class="anchor" aria-label="Permalink: FEATURES" href="#features"><span aria-hidden="true" class="octicon octicon-link"></span></a><h1 class="heading-element">FEATURES</h1>
 <ul>
 <li>accept command line arguments ala <a href="https://metacpan.org/pod/Getopt%3A%3ALong" rel="nofollow">Getopt::Long</a>
