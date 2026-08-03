@@ -1,3 +1,15 @@
+Mon Aug  3 11:58:23 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.2.0]:
+	* release-notes.md: updated
+	* release-notes/release-notes-2.2.0.md: new
+	* README.md: generated
+	* VERSION: bump
+	* t/04-cli-simple-help.t
+	- use_ok to avoid identifying CLI::Simple as a dependency
+	* t/06-cli-simple-default.t: likewise
+	* test-requires.skip: deleted
+
 Sun Aug  2 10:43:02 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.1.3]:
