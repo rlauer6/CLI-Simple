@@ -1,11 +1,9 @@
 requires "Class::Accessor::Fast", "0.51";
 requires "File::ShareDir", "1.118";
-requires "File::Which", "1.23";
+requires "File::Which", "1.27";
 requires "IO::Interactive", "1.027";
-requires "JSON", "4.07";
-requires "List::Util", "1.56";
+requires "JSON", "4.10";
 requires "Readonly", "2.05";
-requires "Role::Tiny", "0";
 requires "Role::Tiny", "2.002004";
 requires "Test::Exit", "0.11";
 requires "Test::Output", "1.036";

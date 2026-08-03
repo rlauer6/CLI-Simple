@@ -1,9 +1,8 @@
-+List::Util 1.56
 Class::Accessor::Fast 0.51
 File::ShareDir 1.118
-File::Which 1.23
+File::Which 1.27
 IO::Interactive 1.027
-JSON 4.07
+JSON 4.10
 Readonly 2.05
-Role::Tiny 0
+Role::Tiny 2.002004
 YAML::Tiny 1.76

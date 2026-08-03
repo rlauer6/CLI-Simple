@@ -160,6 +160,7 @@ sub main {
 
   my $cli = $class->new(
     option_specs    => $manifest ? ( $manifest->{options} // [] )           : [],
+    alias           => $manifest ? ( $manifest->{alias} // {} )             : {},
     default_options => $manifest ? ( $manifest->{default_options} // {} )   : {},
     extra_options   => $manifest ? ( $manifest->{extra_options} // [] )     : [],
     commands        => $manifest ? $manifest->{_dispatch}                   : { default => \&usage },
