@@ -22,6 +22,7 @@ our @EXPORT_OK = qw(
   slurp_json
   toPascalCase
   toCamelCase
+  ToCamelCase
   to_snake_case
 );
 

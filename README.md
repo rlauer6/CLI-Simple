@@ -201,7 +201,7 @@ distribution in one step.
 
 # VERSION
 
-This documentation refers to version 2.2.1.
+This documentation refers to version 2.2.2.
 
 # FEATURES
 
@@ -730,7 +730,6 @@ You must do this during construction or add `help_sections` to your
       default_options => { help_sections => [qw(SYNOPIS COMMANDS OPTIONS)] },
       option_specs    => \@option_specs
     );
-                          
 
 Section names follow [Pod::Usage](https://metacpan.org/pod/Pod%3A%3AUsage) conventions. Subsections are
 specified with a `/` separator, e.g. `DESCRIPTION/Commands` renders
@@ -1419,7 +1418,9 @@ internal use.
 `CLI::Simple` integrates with [Log::Log4perl](https://metacpan.org/pod/Log%3A%3ALog4perl) to provide structured
 logging for your scripts.
 
-To enable logging, call the class method `use_log4perl()` in your
+`CLI::Simple` will initialize [Log::Log4perl](https://metacpan.org/pod/Log%3A%3ALog4perl) for you when you call `use_log4perl()`.
+**This is a convenience, not a requirement** -- you can log however you like.
+To enable logging via `CLI::Simple`, call the class method `use_log4perl()` in your
 module or script:
 
     __PACKAGE__->use_log4perl(
@@ -1436,6 +1437,16 @@ Once enabled, you can access the logger instance via:
 
 This logger supports the standard Log4perl methods like `info`,
 `debug`, `warn`, etc.
+
+_Note: Because it is opt-in, `CLI::Simple` does not itself depend on
+[Log::Log4perl](https://metacpan.org/pod/Log%3A%3ALog4perl). **If your application calls `use_log4perl`, it owns that
+dependency** and must declare it in its own `requires`/`cpanfile`. Static
+dependency scanners cannot see it -- the module is loaded dynamically
+inside the method call -- so you must add it by hand._
+
+_Do not call `use_log4perl` if you use a different logging framework, or if
+you initialize [Log::Log4perl](https://metacpan.org/pod/Log%3A%3ALog4perl) yourself; it would override your
+configuration. Call it only when you want CLI::Simple to own logging setup._
 
 ## Colored Output
 
@@ -1583,6 +1594,26 @@ manifest. Define them programmatically by overriding `main()` if needed._
           %CLI::Simple::INTERNAL_COMMANDS,
           '-my-command' => \&_cmd_my_command,
         );
+
+- My application dies with "use\_log4perl() requires Log::Log4perl..."
+
+    Something in your code calls `__PACKAGE__->use_log4perl(...)` but
+    [Log::Log4perl](https://metacpan.org/pod/Log%3A%3ALog4perl) is not installed in the environment. This commonly first
+    appears in a clean CI run, a hermetic build, or a fresh install -- anywhere
+    the module was not already lying around.
+
+    You have two choices, depending on what you meant:
+
+    - **You want Log::Log4perl logging.** Add it to your distribution's
+    dependencies (`requires 'Log::Log4perl';`). It is not a CLI::Simple
+    prerequisite by design, and static scanners will not add it for you because
+    the call is dynamic -- so declare it yourself.
+    - **You did not mean to use it.** If you log another way, or manage
+    [Log::Log4perl](https://metacpan.org/pod/Log%3A%3ALog4perl) yourself, just remove the `use_log4perl` call.
+
+        # audit any CLI::Simple dist for the mismatch:
+        grep -rl use_log4perl lib bin && grep -q Log::Log4perl cpanfile \
+          || echo 'use_log4perl() called but Log::Log4perl not in cpanfile'
 
 # ALIASING OPTIONS AND COMMANDS
 
