@@ -16,17 +16,12 @@ path:
 extra-files:
   - ChangeLog
   - README.md
+  - t/lib:
+    - t/lib/CLISimpleHelpBoth.pm
+    - t/lib/CLISimpleHelpSynopsis.pm
+    - t/lib/CLISimpleHelpUsage.pm
 man-links:
   - cli-simple: CLI::Simple::Shell
-provides:
-  - CLI::Simple::Constants
-  - CLI::Simple::DumpSpec
-  - CLI::Simple::Helpers
-  - CLI::Simple::Migrate
-  - CLI::Simple::Modulino
-  - CLI::Simple::Scaffold
-  - CLI::Simple::Shell
-  - CLI::Simple::Utils
 resources:
   homepage: http://github.com/rlauer6/CLI-Simple
   bugtracker:

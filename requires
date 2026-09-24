@@ -4,5 +4,5 @@ File::Which 1.27
 IO::Interactive 1.027
 JSON 4.10
 Readonly 2.05
-Role::Tiny 2.002004
+Role::Tiny 2.002005
 YAML::Tiny 1.76
