@@ -30,3 +30,10 @@ module.pm.tmpl
 test.t.tmpl
 extra-files.mk
 local/**
+**/*.bak
+**/*.log
+**/*.tmp
+**/.\#*
+**/\#*
+cpanfile.*
+test-requires.scan

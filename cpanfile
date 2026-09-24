@@ -4,7 +4,7 @@ requires "File::Which", "1.27";
 requires "IO::Interactive", "1.027";
 requires "JSON", "4.10";
 requires "Readonly", "2.05";
-requires "Role::Tiny", "2.002004";
+requires "Role::Tiny", "2.002005";
 requires "Test::Exit", "0.11";
 requires "Test::Output", "1.036";
 requires "YAML::Tiny", "1.76";
