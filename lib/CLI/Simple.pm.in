@@ -513,9 +513,9 @@ sub _get_help_sections {
       if $sections->[$idx] ne $DEFAULT_HELP_SECTIONS[$idx];
   }
 
-  return [ _pod_has_section( $input, 'SYNOPSIS' )
-    ? 'SYNOPSIS'
-    : 'USAGE',
+  return [ _pod_has_section( $input, 'USAGE' )
+    ? 'USAGE'
+    : 'SYNOPSIS',
     'DESCRIPTION/Commands', 'DESCRIPTION/Options', 'OPTIONS', ];
 }
 
@@ -2362,12 +2362,14 @@ If the user supplies the command C<help>, or the C<--help> option,
 C<CLI::Simple> displays the configured help sections using
 L<Pod::Usage>.
 
-For backward compatibility, C<USAGE> is also supported. If no
-C<SYNOPSIS> section is present, C<USAGE> is used as the usage section.
+For backward compatibility, C<USAGE> is also supported. If a C<USAGE>
+section is present, it is used as the usage section.
 
-When both C<SYNOPSIS> and C<USAGE> are present, C<SYNOPSIS> is used by
+If no C<USAGE> section is present, C<SYNOPSIS> is used instead.
+
+When both C<SYNOPSIS> and C<USAGE> are present, C<USAGE> is used by
 default. Applications that explicitly configure C<help_sections> may
-request either or both sections.
+select the desired section.
 
 =head2 Custom help() Method
 

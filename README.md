@@ -201,7 +201,7 @@ distribution in one step.
 
 # VERSION
 
-This documentation refers to version 2.2.3.
+This documentation refers to version 2.2.4.
 
 # FEATURES
 
@@ -1381,12 +1381,14 @@ If the user supplies the command `help`, or the `--help` option,
 `CLI::Simple` displays the configured help sections using
 [Pod::Usage](https://metacpan.org/pod/Pod%3A%3AUsage).
 
-For backward compatibility, `USAGE` is also supported. If no
-`SYNOPSIS` section is present, `USAGE` is used as the usage section.
+For backward compatibility, `USAGE` is also supported. If a `USAGE`
+section is present, it is used as the usage section.
 
-When both `SYNOPSIS` and `USAGE` are present, `SYNOPSIS` is used by
+If no `USAGE` section is present, `SYNOPSIS` is used instead.
+
+When both `SYNOPSIS` and `USAGE` are present, `USAGE` is used by
 default. Applications that explicitly configure `help_sections` may
-request either or both sections.
+select the desired section.
 
 ## Custom help() Method
 
