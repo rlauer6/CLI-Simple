@@ -3,6 +3,7 @@ File::ShareDir 1.118
 File::Which 1.27
 IO::Interactive 1.027
 JSON 4.10
+List::Util 1.33
 Readonly 2.05
 Role::Tiny 2.002005
 YAML::Tiny 1.76
