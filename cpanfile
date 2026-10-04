@@ -3,6 +3,7 @@ requires "File::ShareDir", "1.118";
 requires "File::Which", "1.27";
 requires "IO::Interactive", "1.027";
 requires "JSON", "4.10";
+requires "List::Util", "1.33";
 requires "Readonly", "2.05";
 requires "Role::Tiny", "2.002005";
 requires "Test::Exit", "0.11";

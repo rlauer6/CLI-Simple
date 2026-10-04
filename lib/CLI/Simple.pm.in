@@ -20,7 +20,7 @@ use File::Basename qw(basename);
 use File::Which qw(which);
 use Getopt::Long qw(:config no_ignore_case);
 use IO::Interactive;
-use List::Util qw(zip none pairs any);
+use List::Util qw(none pairs any);
 use Scalar::Util qw(reftype);
 
 our $VERSION = '@PACKAGE_VERSION@';
@@ -644,7 +644,8 @@ sub get_args {
 
   @vars = map { $_ ? $_ : '<undef>' } @vars;
 
-  my %args = map { @{$_} } zip \@vars, [ @{$command_args}[ 0 .. $#vars ] ];
+  my %args;
+  @args{@vars} = @{$command_args}[ 0 .. $#vars ];
 
   delete $args{'<undef>'};
 
