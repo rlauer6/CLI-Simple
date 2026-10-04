@@ -1,3 +1,5 @@
+#-*- mode: makefile; -*-
+
 test-requires.cpanfile: test-requires
 	$(NO_ECHO)$(CPAN_MAKER) create-cpanfile --dependency-type requires $< -o $@
 
@@ -21,4 +23,5 @@ local/.installed:  cpanfile.runtime test-requires.cpanfile
 	    *) echo >&2 "ERROR: unsupported CPAN_INSTALLER: $(CPAN_INSTALLER)"; exit 1 ;; \
 	  esac; \
 	fi; \
+	mkdir -p local; \
 	touch $@

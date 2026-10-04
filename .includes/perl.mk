@@ -42,7 +42,10 @@ $(eval $(call find-files,TIDY_FILES,lib bin,*.tdy))
 $(eval $(call find-files,CRITIC_FILES,lib bin,*.crit))
 $(eval $(call find-files,ERR_FILES,lib bin,*.crit))
 
-CLEANFILES += $(TIDY_FILES) $(CRITIC_FILES) $(ERR_FILES)
+PERL_CHECKED_FILES     = $(PERL_MODULES:%=%.checked)
+PERL_BIN_CHECKED_FILES = $(PERL_BIN_FILES:%=%.checked)
+
+CLEANFILES += $(TIDY_FILES) $(CRITIC_FILES) $(ERR_FILES) $(PERL_CHECKED_FILES) $(PERL_BIN_CHECKED_FILES)
 
 # ------------------------------------------------------------------
 # snippets
@@ -74,19 +77,19 @@ define check_syntax_pm
 	fi; \
 	printf "%s\n" $(PERLWC_SKIP) >> $$perlwc_skip; \
 	for f in $$(cat $$perlwc_skip); do \
-	  [[ "$$f" = "$@" ]] && skip=1 && break; \
+	  [[ "$$f" = "$<" ]] && skip=1 && break; \
 	done; \
 	if [[ "$$skip" -eq 0 ]]; then \
-	  module=$$(echo $@ | perl -npe 's{^lib/}{}; s/\//::/g; s/\.pm$$//;'); \
+	  module=$$(echo $< | perl -npe 's{^lib/}{}; s/\//::/g; s/\.pm$$//;'); \
 	  errfile=$$(mktemp); \
 	  local_cleanfiles="$$local_cleanfiles $$errfile"; \
-	  echo -n "Checking SYNTAX...$@..."; \
+	  echo -n "Checking SYNTAX...$<..."; \
 	  PERL5LIB= perl -wc $(PERLINCLUDE) -M"$$module" -e 1 2>$$errfile \
-	    || { rm -f "$@"; cat $$errfile; exit 1; }; \
+	    || { rm -f "$<"; cat $$errfile; exit 1; }; \
 	  echo "OK"; \
-	  echo -n "Checking POD...$@..."; \
-	  podcheck="$$($(PODCHECKER) $@ 2>&1 || true)"; \
-	  echo "$$podcheck" | grep -q "does not contain\|OK" || { rm -f "$@"; echo "$$podcheck"; exit 1; }; \
+	  echo -n "Checking POD...$<..."; \
+	  podcheck="$$($(PODCHECKER) $< 2>&1 || true)"; \
+	  echo "$$podcheck" | grep -q "does not contain\|OK" || { rm -f "$<"; echo "$$podcheck"; exit 1; }; \
 	  echo "OK"; \
 	fi
 endef
@@ -99,21 +102,33 @@ define check_syntax_pl
 	fi; \
 	printf "%s\n" $(PERLWC_SKIP) >> $$perlwc_skip; \
 	for f in $$(cat $$perlwc_skip); do \
-	  [[ "$$f" = "$@" ]] && skip=1 && break; \
+	  [[ "$$f" = "$<" ]] && skip=1 && break; \
 	done; \
 	if [[ "$$skip" -eq 0 ]]; then \
 	  errfile=$$(mktemp); \
 	  local_cleanfiles="$$local_cleanfiles $$errfile"; \
-	  echo "Checking...$@"; \
-	  PERL5LIB= perl -wc $(PERLINCLUDE) -e 1 2>$$errfile \
-	    || { rm -f "$@"; cat $$errfile; exit 1; }; \
-	  echo "$@ OK"; \
-	  echo "Checking POD...$@"; \
-	  podcheck="$$($(PODCHECKER) $@ 2>&1 || true)"; \
-	  echo "$$podcheck" | grep -q "does not contain\|OK" || { rm -f "$@"; echo "$$podcheck"; exit 1; }; \
-	  echo "$@ OK"; \
+	  echo "Checking...$<"; \
+	  PERL5LIB= perl -wc $(PERLINCLUDE) "$<" 2>$$errfile \
+	    || { rm -f "$<"; cat $$errfile; exit 1; }; \
+	  echo "$< OK"; \
+	  echo "Checking POD...$<"; \
+	  podcheck="$$($(PODCHECKER) $< 2>&1 || true)"; \
+	  echo "$$podcheck" | grep -q "does not contain\|OK" || { rm -f "$<"; echo "$$podcheck"; exit 1; }; \
+	  echo "$< OK"; \
 	fi
 endef
+
+%.pm.checked: %.pm | local/.installed
+	$(NO_ECHO)local_cleanfiles=""; \
+	trap 'rm -f $$local_cleanfiles' EXIT; \
+	$(check_syntax_pm); \
+	touch "$@"
+
+%.pl.checked: %.pl | local/.installed
+	$(NO_ECHO)local_cleanfiles=""; \
+	trap 'rm -f $$local_cleanfiles' EXIT; \
+	$(check_syntax_pl); \
+	touch "$@"
 
 # ------------------------------------------------------------------
 # sentinel rules - real gate or no-op touch based on configuration
@@ -205,20 +220,12 @@ gen-vars-file = $(file >$(1),)$(foreach v,$(TEMPLATE_VARS),$(file >>$(1),$(v)=$(
 # pattern rules
 # ------------------------------------------------------------------
 #
-# Templating and syntax-checking are combined again (previously split
-# into %.pm.checked/%.pl.checked sentinels + a check-syntax target to
-# work around a deps.mk chicken-and-egg problem). That problem is now
-# solved at the source: deps.mk depends on the .pm.in/.pl.in SOURCE
-# files, not the built .pm/.pl targets (see Makefile:
-# `deps.mk: $(PERL_MODULES:%=%.in)`), so deps.mk can always regenerate
-# -- and its edges are always current -- before anything gets built.
-# Real graph edges are respected by GNU Make even under -j, so the
-# combined rule below builds/checks modules in correct dependency
-# order without needing a separate phase-barrier pass.
 
-LOCAL_PREREQ := $(if $(syntax_on),local/.installed)
+# Module/script generation is separate from syntax validation.
+# The .checked sentinels record that the current generated artifact
+# has passed syntax/POD checks.
 
-%.pm: %.pm.in | $(LOCAL_PREREQ)
+%.pm: %.pm.in
 	$(call gen-vars-file,$<.vars)
 	$(NO_ECHO)module_tmp="$$(mktemp)"; \
 	local_cleanfiles="$$module_tmp"; \
@@ -227,25 +234,23 @@ LOCAL_PREREQ := $(if $(syntax_on),local/.installed)
 	$(run_podextract); \
 	rm -f "$@"; \
 	cp "$$module_tmp" "$@"; \
-	chmod -w "$@"; \
-	$(if $(syntax_on),$(check_syntax_pm))
+	chmod -w "$@"
 
-%.pl: %.pl.in | $(LOCAL_PREREQ)
+%.pl: %.pl.in
 	$(call gen-vars-file,$<.vars)
 	$(NO_ECHO)local_cleanfiles=""; \
 	trap 'rm -f $$local_cleanfiles $<.vars' EXIT; \
 	rm -f "$@"; \
 	$(BOOTSTRAPPER) resolve-vars $< > $@; \
 	chmod +x "$@"; \
-	chmod -w "$@"; \
-	$(if $(syntax_on),$(check_syntax_pl))
+	chmod -w "$@"
 
-# kept as a convenience alias (Makefile's $(TARBALL) target depends on
-# this explicitly) -- syntax checking is bundled into the rules above
-# again, so this is just $(PERL_MODULES)/$(PERL_BIN_FILES) by another
-# name.
 .PHONY: check-syntax
-check-syntax: $(PERL_MODULES) $(PERL_BIN_FILES) ## verify all built modules/scripts compile and pass podchecker
+ifneq ($(syntax_on),)
+check-syntax: $(PERL_CHECKED_FILES) $(PERL_BIN_CHECKED_FILES)
+else
+check-syntax:
+endif
 
 # ------------------------------------------------------------------
 # convenience targets
@@ -300,21 +305,28 @@ critic: ## run perlcritic on all source files
 lint: ## run all linting tools (tidy + critic)
 	$(NO_ECHO)$(MAKE) tidy critic
 
-# dependencies
-#
-# deps.mk's self-remake rule now depends on the .pm.in/.pl.in SOURCE
-# files (see Makefile: `deps.mk: $(PERL_MODULES:%=%.in)`), not the
-# built .pm/.pl targets. `make clean` never touches source files, so
-# including this unconditionally can no longer force a build-then-
-# delete cycle during clean/distclean the way it used to when deps.mk
-# depended on $(PERL_MODULES) directly.
--include deps.mk
+ifneq ($(syntax_on),)
+
+include deps.mk
+
+# deps.mk depends on SOURCE (.pm.in), not the built .pm targets.
+# cmb create-deps already scans .pm.in directly, so this makes deps.mk
+# regenerate purely from source edits -- no build artifacts involved,
+# so there's no chicken-and-egg with $(PERL_MODULES) needing to be
+# built before deps.mk can be regenerated, and 'make clean' can never
+# trigger a rebuild through this include (clean doesn't touch .pm.in).
+deps.mk: $(SOURCE_FILES_IN)
+	$(NO_ECHO)cmb create-deps > $@.tmp \
+	  && mv $@.tmp $@ \
+	  || { rm -f $@.tmp; false; }
+
+endif
 
 # custom make rules
 #
 # project.mk is plain data (module dependency edges) with no rule to
 # remake itself. It's also the conventional place to drop extra
 # clean-local:: recipes, so it must stay included unconditionally in
-# all cases, same as deps.mk above.
+# all cases
 -include project.mk
 

@@ -38,3 +38,5 @@ local/**
 cpanfile.*
 test-requires.scan
 test-requires.cpanfile
+!cpanfile.darkpan
+deps.mk
