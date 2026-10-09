@@ -869,10 +869,10 @@ To provide built-in usage/help output, include a `=head1 SYNOPSIS`
 section in your script's POD:
 
     =head1 SYNOPSIS
-    
+
     ```
     usage: myscript [options] command args
-    
+
     Options
     -------
     --help, -h      Display help
@@ -1683,8 +1683,6 @@ manifest. Define them programmatically by overriding `main()` if needed._
 
 - My application dies with "use\_log4perl() requires Log::Log4perl..."
 
-    `Log::Log4perl` is an optional dependency of `CLI::Simple`.
-
     Since not all scripts require logging, `Log::Log4perl` is an
     _optional dependency_ of `CLI::Simple`.  If your application calls
     `use_log4perl()`, `Log::Log4perl` must be installed.
@@ -1724,8 +1722,8 @@ option names and command names. Use the `alias` parameter to `new():`
     After option parsing and normalization, values are mirrored so either
     name can be used consistently.
 
-    When both the canonical option and an alias are supplied,
-    the last occurrence on the command line determines the value.
+    When both the canonical option and an alias are supplied the canonical
+    name wins.
 
 - No duplicate injection
 
@@ -1771,7 +1769,7 @@ option names and command names. Use the `alias` parameter to `new():`
 
 After parsing, both `get_config()` and `get_cfg()` will return the
 same value. If the user passes both `--config` and `--cfg`, the value
-from `--cfg` (the alias) is used.
+from `--config` (the canonical version) is used.
 
 _Note: In role-based applications using a YAML manifest, command
 aliases are expressed by mapping the alias command directly to the
