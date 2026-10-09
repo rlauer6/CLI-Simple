@@ -40,3 +40,10 @@ test-requires.scan
 test-requires.cpanfile
 !cpanfile.darkpan
 deps.mk
+*.reconciled
+*.rendered
+build-config.mk
+release-*.diffs
+release-*.gz
+release-*.lst
+release-*.status
