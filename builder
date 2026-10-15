@@ -207,7 +207,9 @@ set -x
 
 install_build_deps
 
+PATH=/build/local/bin:$PATH
 make clean
 make builder-pre
+
 time make
 make builder-post

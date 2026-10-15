@@ -5,16 +5,18 @@
 * [DESCRIPTION](#description)
 * [VERSION](#version)
 * [FEATURES](#features)
+* [QUICK START](#quick-start)
+  * [Single-Module Application](#single-module-application)
+  * [Role-Based Application](#role-based-application)
 * [MODULINOS](#modulinos)
   * [Why Modulinos?](#why-modulinos)
   * [The Bash Wrapper](#the-bash-wrapper)
   * [create-modulino](#create-modulino)
   * [MODULINO\_WRAPPER](#modulino\wrapper)
-* [QUICK START](#quick-start)
-  * [Single-Module Application](#single-module-application)
-  * [Role-Based Application](#role-based-application)
 * [ROLE-BASED ARCHITECTURE](#role-based-architecture)
   * [The YAML Manifest](#the-yaml-manifest)
+  * [Loading Multiple Manifests](#loading-multiple-manifests)
+  * [Option Initialization](#option-initialization)
   * [Command Values](#command-values)
   * [`roles:` vs `commands:`](#roles-vs-commands)
   * [When to Use Each Approach](#when-to-use-each-approach)
@@ -46,6 +48,7 @@
   * [command\_args](#command\args)
   * [commands](#commands)
   * [main](#main)
+  * [options](#options)
   * [run](#run)
   * [get\_args](#get\args)
     * [With names](#with-names)
@@ -55,6 +58,7 @@
 * [COMMAND LINE OPTIONS](#command-line-options)
   * [Getopt::Long Configuration](#getoptlong-configuration)
 * [COMMAND ARGUMENTS](#command-arguments)
+  * [set\_args](#set\args)
 * [CUSTOM ERROR HANDLER](#custom-error-handler)
 * [SETTING DEFAULT VALUES FOR OPTIONS](#setting-default-values-for-options)
 * [ADDING ADDITIONAL ACCESSORS](#adding-additional-accessors)
@@ -85,44 +89,39 @@ CLI::Simple - a minimalist object oriented base class for CLI applications
     use strict;
     use warnings;
 
-    use CLI::Simple::Constants qw(:booleans :chars);
-    use CLI::Simple qw($AUTO_HELP $AUTO_DEFAULT);
-
     use parent qw(CLI::Simple);
 
     caller or exit __PACKAGE__->main();
 
-    sub execute {
-      my ($self) = @_;
-
-      # retrieve a CLI option   
-      my $file = $self->get_file;
-      ...
-    }
-
-    sub list { 
-      my ($self) = @_
-
-      # retrieve a command argument
-      my ($file) = $self->get_args();
-      ...
-    }
-
     sub main {
-
-      # Disable auto-default for single commands, enable auto-help
-      $AUTO_DEFAULT = 0;
-      $AUTO_HELP = 1;
 
       my $cli = MyScript->new(
        option_specs    => [ qw( help format=s file=s) ],
        default_options => { format => 'json' }, # set some defaults
        extra_options   => [ qw( content ) ], # non-option, setter/getter
-       commands        => { execute => \&execute, list => \&list,  }
+       commands        => { execute => \&cmd_execute, list => \&cmd_list,  },
        alias           => { options => { fmt => 'format' }, commands => { ls => 'list' } },
       );
 
       return $cli->run();
+    }
+
+    sub cmd_execute {
+      my ($self) = @_;
+
+      # retrieve a CLI option   
+      my $file = $self->get_file;
+      ...
+      return 0;
+    }
+
+    sub cmd_list { 
+      my ($self) = @_;
+
+      # retrieve a command argument
+      my ($file) = $self->get_args();
+      ...
+      return 0;
     }
 
     1;
@@ -210,7 +209,7 @@ set of command roles.
 
 # VERSION
 
-This documentation refers to version 2.3.0.
+This documentation refers to version 2.3.2.
 
 # FEATURES
 
@@ -226,98 +225,6 @@ This documentation refers to version 2.3.0.
 - bash completion script generation for modulino wrappers
 - optional pager support for help output via [IO::Pager](https://metacpan.org/pod/IO%3A%3APager)
 - customizable help sections via `help_sections`
-
-# MODULINOS
-
-A _modulino_ is a Perl module that can also be run directly as a
-script. The term was coined by Brian D. Foy and the pattern is simple:
-
-    caller or exit __PACKAGE__->main();
-
-When the file is `require`d or `use`d by another module, `caller`
-returns the calling package and the expression short-circuits -
-`main()` is never called. When the file is executed directly by Perl,
-`caller` returns false and `main()` runs. The same file serves as
-both a reusable module and an executable script.
-
-`CLI::Simple` is designed around this pattern. Every `CLI::Simple`
-application is expected to be a modulino. The framework's lifecycle,
-internal commands, bash completion, and scaffolding tools all assume
-this dual-use design.
-
-## Why Modulinos?
-
-The modulino pattern offers several advantages over a traditional
-script:
-
-- **Testable** - your script logic lives in a proper Perl module
-that can be `use`d in test files without executing `main()`
-- **Reusable** - other scripts and modules can `use` your
-modulino and call its methods directly
-- **Introspectable** - tools like `-dump-spec` and
-`-generate-completion` can load your modulino and inspect its live
-state without running it as a script
-- **Installable** - modulinos distribute cleanly as CPAN modules
-with full man page support via [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper)
-
-## The Bash Wrapper
-
-Perl modulinos are invoked via a thin bash wrapper script that locates
-the installed module file and passes all arguments through to Perl:
-
-    #!/usr/bin/env bash
-    #-*- mode: sh; -*-
-
-    MODULINO_WRAPPER=my-script
-    MODULE_NAME=My::Script
-    MODULE_PATH=$(MODULE_PATH="${MODULE_NAME//:://}.pm" \
-      perl -M$MODULE_NAME -e 'print $INC{$ENV{MODULE_PATH}};')
-
-    MODULINO_WRAPPER=$MODULINO_WRAPPER perl $MODULE_PATH "$@"
-
-The wrapper locates the installed `.pm` file via `%INC` and sets
-`MODULINO_WRAPPER` in the environment so `CLI::Simple` knows the
-name of the script the user actually typed. This is used by
-`-generate-completion` to name the bash completion function correctly
-and by [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper) to create man page symlinks.
-
-## create-modulino
-
-`CLI::Simple` ships with a `create-modulino` tool that generates the
-bash wrapper for any `CLI::Simple` modulino:
-
-    # create wrapper using module name convention (My::Script -> my-script)
-    create-modulino -m My::Script
-
-    # install to a specific directory
-    create-modulino -m My::Script -i /usr/local/bin
-
-    # use a custom wrapper name
-    create-modulino -m My::Script -a my-alias -i /usr/local/bin
-
-`create-modulino` is itself a modulino - an example of the pattern it
-creates. The bash wrapper template lives in its `__DATA__` section,
-keeping the tool entirely self-contained.
-
-If you are building a CPAN distribution, [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper)
-integrates `create-modulino` into the `make modulino` target,
-generating and installing the wrapper as part of the build process.
-
-## MODULINO\_WRAPPER
-
-The `MODULINO_WRAPPER` environment variable tells `CLI::Simple` the
-name of the wrapper script that invoked the modulino. It is set by the
-wrapper and used by:
-
-- `-generate-completion` - to name the bash completion function
-and `complete` target correctly
-- Man page symlinks via [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper) - so
-`man my-script` resolves to the module's man page
-
-If `MODULINO_WRAPPER` is not set, `CLI::Simple` infers the script
-name from the module name by convention - `My::Script` becomes
-`my-script`. Set it explicitly when the wrapper name does not follow
-this convention.
 
 # QUICK START
 
@@ -413,6 +320,98 @@ project tarball from a monolithic script or a YAML manifest. For a
 comprehensive guide on transitioning your application, see
 ["ROLE-BASED ARCHITECTURE"](#role-based-architecture).
 
+# MODULINOS
+
+A _modulino_ is a Perl module that can also be run directly as a
+script. The term was coined by Brian D. Foy and the pattern is simple:
+
+    caller or exit __PACKAGE__->main();
+
+When the file is `require`d or `use`d by another module, `caller`
+returns the calling package and the expression short-circuits -
+`main()` is never called. When the file is executed directly by Perl,
+`caller` returns false and `main()` runs. The same file serves as
+both a reusable module and an executable script.
+
+`CLI::Simple` is designed around this pattern. Every `CLI::Simple`
+application is expected to be a modulino. The framework's lifecycle,
+internal commands, bash completion, and scaffolding tools all assume
+this dual-use design.
+
+## Why Modulinos?
+
+The modulino pattern offers several advantages over a traditional
+script:
+
+- **Testable** - your script logic lives in a proper Perl module
+that can be `use`d in test files without executing `main()`
+- **Reusable** - other scripts and modules can `use` your
+modulino and call its methods directly
+- **Introspectable** - tools like `-dump-spec` and
+`-generate-completion` can load your modulino and inspect its live
+state without running it as a script
+- **Installable** - modulinos distribute cleanly as CPAN modules
+with full man page support via [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper)
+
+## The Bash Wrapper
+
+Perl modulinos are invoked via a thin bash wrapper script that locates
+the installed module file and passes all arguments through to Perl:
+
+    #!/usr/bin/env bash
+    #-*- mode: sh; -*-
+
+    MODULINO_WRAPPER=my-script
+    MODULE_NAME=My::Script
+    MODULE_PATH=$(MODULE_PATH="${MODULE_NAME//:://}.pm" \
+      perl -M$MODULE_NAME -e 'print $INC{$ENV{MODULE_PATH}};')
+
+    MODULINO_WRAPPER=$MODULINO_WRAPPER perl $MODULE_PATH "$@"
+
+The wrapper locates the installed `.pm` file via `%INC` and sets
+`MODULINO_WRAPPER` in the environment so `CLI::Simple` knows the
+name of the script the user actually typed. This is used by
+`-generate-completion` to name the bash completion function correctly
+and by [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper) to create man page symlinks.
+
+## create-modulino
+
+`CLI::Simple` ships with a `create-modulino` tool that generates the
+bash wrapper for any `CLI::Simple` modulino:
+
+    # create wrapper using module name convention (My::Script -> my-script)
+    create-modulino -m My::Script
+
+    # install to a specific directory
+    create-modulino -m My::Script -i /usr/local/bin
+
+    # use a custom wrapper name
+    create-modulino -m My::Script -a my-alias -i /usr/local/bin
+
+`create-modulino` is itself a modulino - an example of the pattern it
+creates. The bash wrapper template lives in its `__DATA__` section,
+keeping the tool entirely self-contained.
+
+If you are building a CPAN distribution, [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper)
+integrates `create-modulino` into the `make modulino` target,
+generating and installing the wrapper as part of the build process.
+
+## MODULINO\_WRAPPER
+
+The `MODULINO_WRAPPER` environment variable tells `CLI::Simple` the
+name of the wrapper script that invoked the modulino. It is set by the
+wrapper and used by:
+
+- `-generate-completion` - to name the bash completion function
+and `complete` target correctly
+- Man page symlinks via [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper) - so
+`man my-script` resolves to the module's man page
+
+If `MODULINO_WRAPPER` is not set, `CLI::Simple` infers the script
+name from the module name by convention - `My::Script` becomes
+`my-script`. Set it explicitly when the wrapper name does not follow
+this convention.
+
 # ROLE-BASED ARCHITECTURE
 
 `CLI::Simple` 2.0.0 introduced an optional role-based architecture
@@ -430,21 +429,14 @@ its original behavior of composing the complete set of command roles.
 
 ## The YAML Manifest
 
-The manifest is a YAML file that declares your commands, options, and
-defaults. By convention the filename is derived from your module name:
+By default, `CLI::Simple` locates the application's manifest via
+[File::ShareDir](https://metacpan.org/pod/File%3A%3AShareDir) using the distribution name derived from the module
+name. The manifest must be installed as part of the distribution.
 
-    My::Script                 ->  my-script.yml
-    CPAN::Maker::Bootstrapper  ->  cpan-maker-bootstrapper.yml
-
-`CLI::Simple` locates the manifest via [File::ShareDir](https://metacpan.org/pod/File%3A%3AShareDir) using the
-distribution name derived from the module name. The manifest must be
-installed as part of the distribution - it cannot be loaded from an
-arbitrary location.
-
-_Security note: The manifest is loaded exclusively from the
-distribution share directory via [File::ShareDir](https://metacpan.org/pod/File%3A%3AShareDir). A manifest that
-was not installed as part of the distribution cannot be loaded. This
-provides the same security model as Perl module loading itself._
+Additional YAML manifests may be supplied as arguments to
+`use CLI::Simple`. These may be explicit filenames or glob patterns,
+allowing applications to discover command registrations from
+project-local configuration files.
 
 _Note: Version 2.3.0 introduces `roles:` for selective role
 composition. The original `commands:` form remains supported for
@@ -461,7 +453,8 @@ A minimal manifest:
       - verbose|v
       - output|o=s
 
-A complete manifest with all supported keys:
+A manifest defining commands, options, defaults, and additional
+accessors:
 
     ---
     roles:
@@ -476,6 +469,92 @@ A complete manifest with all supported keys:
     extra_options:
       - dbh
       - config_data
+
+Manifest section names use underscores, not hyphens. For example,
+`default_options` and `extra_options` are valid section names;
+`default-options` and `extra-options` are not.
+
+Unknown manifest keys and values that do not match the expected
+section types cause an error when the manifest is loaded.
+
+## Loading Multiple Manifests
+
+`CLI::Simple` supports loading multiple YAML manifests during import.
+This allows an application to extend its commands, roles, and options
+without modifying its primary manifest. Each additional manifest may
+contribute command definitions, option specifications, default values,
+and additional accessors.
+
+Additional manifests may be specified as filenames:
+
+    use CLI::Simple qw(
+      :roles
+      extensions/publish.yml
+      extensions/deploy.yml
+    );
+
+Glob patterns are also supported:
+
+    use CLI::Simple qw(
+      :roles
+      .roles/*/role.yml
+    );
+
+When `:roles` is specified, `CLI::Simple` first attempts to load the
+application's installed manifest through [File::ShareDir](https://metacpan.org/pod/File%3A%3AShareDir). Additional
+manifests are then loaded in the order supplied.
+
+All manifests contribute `options`, `default_options`, and
+`extra_options` to the application's global option namespace. Duplicate
+option names (including aliases) and duplicate default keys are errors.
+Repeated `extra_options` declarations are harmless, and an accessor may
+appear in both `options` and `extra_options`.
+
+The first manifest alone supplies application-wide `alias` and
+`abbreviations` metadata. Subsequent manifests also contribute
+`roles:` and `commands:` entries.
+
+Command names must be unique across all manifests. An attempt to
+register a command more than once causes an error.
+
+An unmatched glob pattern contributes no manifests and does not cause
+an error. An explicitly named YAML file that cannot be loaded causes
+an error.
+
+Explicit YAML filenames may also be supplied without `:roles`:
+
+    use CLI::Simple qw(
+      config/application.yml
+      .roles/*/role.yml
+    );
+
+In this case, the first explicitly supplied manifest provides the
+application-wide configuration.
+
+Loading a manifest does not compose its roles. For commands declared
+under `roles:`, only the roles associated with the selected command
+are composed during application startup.
+
+See ["roles: vs commands:"](#roles-vs-commands) for the distinction between selective
+and legacy role composition.
+
+## Option Initialization
+
+Option specifications and defaults from all manifests are registered
+globally, but only the **roles** for the selected command are composed.
+
+Because option specifications and defaults are merged from all
+manifests, they are available regardless of which command is selected.
+Manifest defaults are equivalent to values supplied through the
+`default_options` argument to `new()`.
+
+Applications should use `init()` when option values require
+additional initialization or resolution after command-line parsing.
+
+Manifest defaults are applied before `init()`, but after command-line
+options have been parsed. Applications may inspect `options()` to
+determine which options were explicitly supplied on the command line
+and override default values during `init()`.
 
 ## Command Values
 
@@ -518,7 +597,7 @@ New applications should use `roles:`. The original `commands:`
 manifest key remains supported for backward compatibility.
 
 With `commands:`, selecting a command causes all roles referenced
-by the manifest's command definitions to be composed into the
+by the loaded manifests' command definitions to be composed into the
 application, regardless of which command is being executed.
 
 This makes methods from every composed role available throughout
@@ -628,30 +707,41 @@ regardless of which command is selected.
 
 ## Activating Role-Based Architecture
 
-Add `:roles` to your `use CLI::Simple` statement:
+Role-based applications load their YAML manifests through
+`use CLI::Simple`.
+
+To load the application's installed manifest, specify `:roles`:
 
     use CLI::Simple qw(:roles);
 
-This causes `CLI::Simple` to load the YAML manifest and retain its
-command, role, option, alias, and abbreviation metadata for the
-application.
+`CLI::Simple` locates the manifest through [File::ShareDir](https://metacpan.org/pod/File%3A%3AShareDir)
+and retains its command, role, option, alias, and abbreviation
+metadata for the application.
 
-Role composition does not occur while the manifest is being loaded.
+Alternatively, specify an explicit YAML manifest:
 
-When the application is started, `CLI::Simple` first resolves the
-selected command, including aliases and abbreviations. It then composes
-the role or roles required by that command.
+    use CLI::Simple qw(config/application.yml);
 
-For commands declared beneath `roles:`, only the associated role set
-is composed.
+Both forms may be combined with additional YAML manifests or
+glob patterns. See ["Loading Multiple Manifests"](#loading-multiple-manifests).
+
+Role composition does not occur while manifests are being loaded.
+
+When the application starts, `CLI::Simple` resolves the selected
+command, including aliases and abbreviations, before composing
+the required roles.
+
+For commands declared beneath `roles:`, only the associated
+role set is composed.
 
 For legacy commands declared beneath `commands:`, the original
-all-role composition behavior is retained for backward compatibility.
+all-role composition behavior is retained for backward
+compatibility.
 
 ## The Inherited main()
 
-When using `:roles`, your class inherits `main()` from
-`CLI::Simple`:
+When using a YAML manifest, your class can inherit `main()`
+from `CLI::Simple`:
 
     caller or exit __PACKAGE__->main;
 
@@ -669,20 +759,38 @@ startup behavior that cannot be expressed through the manifest,
 
 ## Distributing the Manifest
 
-The YAML manifest is part of the application's runtime configuration
-and must be installed with the distribution.
+When using `:roles`, the application's primary YAML manifest must
+be installed in the distribution's share directory.
 
 `CPAN::Maker` users can add it to `extra-files` in
-`buildspec.yml` so it is installed into the distribution's share
-directory:
+`buildspec.yml`:
 
     extra-files:
       - share:
         - my-script.yml
 
-During development the manifest is found via `%INC`. After
-installation it is found via [File::ShareDir](https://metacpan.org/pod/File%3A%3AShareDir). No code changes are
-required between the two environments.
+Additional manifests supplied as import arguments are loaded from
+the filesystem. They do not need to be installed in the
+distribution's share directory.
+
+For example:
+
+    use CLI::Simple qw(
+      :roles
+      .roles/*/role.yml
+    );
+
+This allows applications to maintain additional commands, roles,
+and options independently of their primary manifest.
+
+For example, an application may load optional extensions from
+`.roles/`. Each extension can provide its own manifest and
+implementation without modifying the application's primary
+manifest. Extensions are available only when their manifests
+are present and loaded.
+
+See ["Loading Multiple Manifests"](#loading-multiple-manifests) for manifest precedence and
+merging behavior.
 
 # PHILOSOPHY AND DESIGN PRINCIPLES
 
@@ -733,9 +841,14 @@ For interactive CLI handling or complex command trees, consider
 
 - **Phase 0: Manifest Loading**
 
-    For role-based applications using `use CLI::Simple qw(:roles)`, the
-    YAML manifest is loaded during `import` and its command, role, option,
-    alias, and abbreviation metadata is retained for the application.
+    For role-based applications, YAML manifests are loaded during
+    `import`. The application's installed manifest may be loaded
+    through `:roles`, and additional manifests may be supplied as
+    filenames or glob patterns.
+
+    The manifests are merged and normalized before their command,
+    role, option, alias, and abbreviation metadata is retained
+    for the application.
 
     Roles are not composed during manifest loading.
 
@@ -752,18 +865,25 @@ For interactive CLI handling or complex command trees, consider
     commands prefixed with `-`. If one is found it executes immediately
     and exits. See ["INTERNAL COMMANDS"](#internal-commands).
 
-- **Phase 2: Initialization (`new` =** `init`)>
+- **Phase 2: Initialization (`new`)**
 
     The constructor parses command-line arguments via `Getopt::Long`,
-    creates accessors for all options, and calls your `init()` method.
-    Inside `init()`, your application has full access to the parsed options 
-    and arguments. This phase is the ideal hook for all final setup tasks, 
-    such as:
+    creates accessors for all options, initializes logging if enabled,
+    calls `init()` and then initializes any defaults option values
+    you passed to the constructor.
+
+    Inside `init()`, your application has full access to the parsed
+    options and arguments. This phase is the ideal hook for all final
+    setup tasks, such as:
 
     - Validating command-line arguments.
     - Loading configuration files based on a `--config` option.
-    - Dynamically overriding the command (e.g, `$self->command('new_default')`).
+    - Dynamically overriding the command (e.g., `$self->command('new_default')`).
+    - Overriding default options
     - Performing any setup required **before** a command is run.
+
+    After `init()` returns, any remaining undefined options are
+    initialized from the `default_options` passed to the constructor.
 
 - **Phase 3: Execution (`run`)**
 
@@ -795,13 +915,13 @@ This provides an ideal hook for applications that need to perform
 by checking for a specific flag inside `init()`, without also
 triggering an unwanted command.
 
-In role-based applications using a YAML manifest, a `default` command
-that aliases another command should map to the sub name directly rather
-than a role class:
+In applications using a YAML manifest, a default command can be
+declared using `commands:`. For applications using selective
+`roles:` composition, the default command can be associated with
+a role directly:
 
-    commands:
-      default: cmd_install
-      install: My::Module::Role::Installer
+    roles:
+      default: My::Module::Role::Installer
 
 ## `$AUTO_HELP` and `$AUTO_DEFAULT`
 
@@ -822,11 +942,8 @@ assume a command or provide usage if no command is provided.
 - `$AUTO_DEFAULT`
 
     Set the package variable `$AUTO_DEFAULT` to a true value if you want
-    `CLI::Simple` to automatically select a command if you have only 1
-    command defined and no command is provided on the command line. When
-    true, it will prepend the single command name to the argument list,
-    allowing any subsequent arguments to be correctly parsed as args for
-    that command.
+    `CLI::Simple` to automatically select a command when exactly one
+    command is registered and no command is provided on the command line.
 
     default: false
 
@@ -866,7 +983,7 @@ To use them in your script:
 # ADDING USAGE TO YOUR SCRIPTS
 
 To provide built-in usage/help output, include a `=head1 SYNOPSIS`
-section in your script's POD:
+or `=head1 USAGE` section in your script's POD:
 
     =head1 SYNOPSIS
 
@@ -909,10 +1026,10 @@ to present help information that differs from the embedded POD.
 
 ### `help_sections`
 
-By default `CLI::Simple` renders the following POD sections when
-present, subject to the usage section selection described above:
+By default, `CLI::Simple` renders the following POD sections when
+present:
 
-    SYNOPSIS
+    USAGE (or SYNOPSIS if USAGE is absent)
     DESCRIPTION/Commands
     DESCRIPTION/Options
     OPTIONS
@@ -925,9 +1042,8 @@ section names during construction:
       ...
     );
 
-When `help_sections` is supplied explicitly, `CLI::Simple` honors the
-list exactly as provided. For example, an application may request both
-`SYNOPSIS` and `USAGE`:
+When `help_sections` differs from the default selection,
+`CLI::Simple` honors the list exactly as provided.
 
     help_sections => [qw(SYNOPSIS USAGE)]
 
@@ -942,24 +1058,6 @@ specified with a `/` separator; for example,
 use. These commands are intercepted before option parsing begins and
 execute immediately, bypassing the normal lifecycle entirely. See
 ["The init-run Lifecycle"](#the-init-run-lifecycle).
-
-Internal commands are dispatched via the `%INTERNAL_COMMANDS` package
-variable:
-
-    our %INTERNAL_COMMANDS = (
-      '-generate-completion' => \&_cmd_generate_completion,
-      '-dump-spec'           => \&_cmd_dump_spec,
-      '-scaffold'            => \&_cmd_scaffold,
-      '-migrate'             => \&_cmd_migrate,
-    );
-
-Subclasses can add their own internal commands by extending the hash
-before `new()` is called:
-
-    our %INTERNAL_COMMANDS = (
-      %CLI::Simple::INTERNAL_COMMANDS,
-      '-my-command' => \&_cmd_my_command,
-    );
 
 ## -generate-completion
 
@@ -993,10 +1091,8 @@ directory (requires root):
     my-script -generate-completion > \
       /etc/bash_completion.d/my-script
 
-The script name is taken from the first argument if provided, then
-`MODULINO_WRAPPER` if set, then inferred from the module name. If the
-inferred name cannot be found in `PATH`, a warning is issued but the
-completion script is still generated.
+The script name is taken from `MODULINO_WRAPPER` when set,
+otherwise it is inferred from the module name.
 
 _Note: If you created the modulino with the supplied
 `create-modulino` tool `MODULINO_WRAPPER` is already set inside the
@@ -1010,25 +1106,11 @@ bash script that invokes the modulino._
 
 - Case 2: Your modulino wrapper was created using `create-modulino`
 
-    The modulino script `my-alias` refers to My::Modulino. Although the wrapper name differs from the module name,
-    `MODULINO_WRAPPER` is set by the generated bash wrapper.
+    The modulino script `my-alias` refers to My::Modulino. Although the
+    wrapper name differs from the module name, `MODULINO_WRAPPER` is set
+    by the generated bash wrapper.
 
         my-alias -generate-completion
-
-- Case 3: Your modulino is an alias not created by `create-modulino`
-
-    Without `MODULINO_WRAPPER`, the generated completion script may
-    use the path to the Perl module rather than the wrapper's command
-    name. The `-generate-completion` script called by 
-    your custom wrapper most likely only resolves the program name as the path to
-    your Perl module:
-
-        path-to-modules/My/Module.pm
-
-    ...in this case you need to supply the alias name or set
-    `MODULINO_WRAPPER` in the environment.
-
-        my-alias -generate-completion my-alias
 
 ## -dump-spec
 
@@ -1068,10 +1150,11 @@ If you've turned your monolith's package into a modulino:
 
     cli-simple -scaffold my-script.yml         # scaffold from spec file
 
-The tarball will be named `my-script-roles.tar.gz` by convention (the
-lower case snake cased version of the class name). The name is used to
-infer the class name. If your filename is different than the
-classes you want to scaffold, you will need to edit the files. 
+The generated tarball is named from the distribution identifier
+derived from the application class or supplied specification file,
+with a `-roles.tar.gz` suffix. The name is used to infer the class
+name. If your filename is different than the classes you want to
+scaffold, you will need to edit the files.
 
 Extract the content to a directory and start editing. If you feed the tarball
 to [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper) via the `import-scaffold` command you can
@@ -1110,10 +1193,8 @@ name and its arguments._
 
     A boolean that determines whether abbreviated command names are allowed.
 
-    When true, the `run()` method will treat the provided command as a prefix
-    and compare it to the keys in the command hash. If exactly one match is
-    found, it will be used. If more than one match is found, or if no match is
-    found, `run()` will throw an exception.
+    When true, `validate_command()` treats the provided command as a
+    prefix and compares it to the keys in the command hash.
 
     This allows for convenient shorthand like:
 
@@ -1193,25 +1274,16 @@ name and its arguments._
 
         sub init {
           my ($self) = @_;
-
-          my @args = $self->get_args;
-
-          if ( ! @args ) {
-            $self->command_args($self->command()); # set the args to the command
-            $self->command('get'); # set the command to your default
+        
+          my $command = $self->command;
+        
+          if ( !exists $self->commands->{$command} ) {
+            $self->command_args($command, $self->get_args);
+            $self->command('get');
           }
-          else {
-            die "ERROR: unknown command\n"
-              if !$self->commands->{$self->command}; # validate the command
-          }
-          ...
+        
           return;
         }
-
-    _NOTE: This only works if your commands have a deterministic number
-    of arguments. For example you might always require at least 1
-    argument. If you have no arguments as in the above recipe you would
-    assume command is the argument to your default command._
 
 ## command
 
@@ -1230,7 +1302,7 @@ command that will be executed when you call the `run()` method.
 Gets or sets the argument list. Similar to `get_args` when no
 arguments are passed except it returns an array reference.
 
-To replace or add to the argument list, pass an array or list.
+To replace the argument list, pass an array reference or a list.
 
     my $args = $self->command_args;
     $self->command_args(@{$args}, 'foo');
@@ -1251,9 +1323,9 @@ to the dispatch hash. `handler` must be a code reference.
     __PACKAGE__->main;
 
 For role-based applications, `main` is inherited from `CLI::Simple`
-and reads the YAML manifest loaded during `import`. It constructs the
-object with the manifest's options, default options, extra options, and
-dispatch table, then calls `run()`.
+and uses the manifest configuration assembled during `import`.
+It constructs the application with its options, defaults, and
+registered commands, then calls `run()`.
 
 In a role-based modulino, the entire `main` sub reduces to:
 
@@ -1262,6 +1334,18 @@ In a role-based modulino, the entire `main` sub reduces to:
 For single-module applications, override `main` in your subclass as
 usual.
 
+## options
+
+Returns a hash reference containing the command-line options parsed
+by `Getopt::Long`. Option names are normalized to snake\_case.
+
+The hash contains only options explicitly supplied on the command
+line. It does not include values supplied by `default_options` or
+subsequently initialized by `init()`.
+
+Applications can use this hash to distinguish command-line options
+from default values when resolving configuration.
+
 ## run
 
 Executes the selected command using the parsed options and arguments.
@@ -1269,8 +1353,8 @@ The `run` method dispatches control to the corresponding command
 subroutine.
 
 Command subroutines should return `0` for success and a non-zero
-value for failure. The return value is used as the script's exit
-status.
+value for failure. `run()` returns the command subroutine's return
+value, which can be used as the script's exit status.
 
 ## get\_args
 
@@ -1322,12 +1406,13 @@ initialization and validation.
 
 # USING PACKAGE VARIABLES
 
-Constructor arguments may also be defined using package variables.
-This provides a declarative alternative to passing configuration
-directly to `new()`.
+The `default_options`, `extra_options`, `option_specs`, and
+`commands` constructor arguments may also be defined using package
+variables. This provides a declarative alternative to passing these
+configuration values directly to `new()`.
 
-Package variable names correspond to constructor argument names,
-converted to uppercase.
+The corresponding package variables are `$DEFAULT_OPTIONS`,
+`$EXTRA_OPTIONS`, `$OPTION_SPECS`, and `$COMMANDS`.
 
     our $OPTION_SPECS = [
       qw(
@@ -1355,7 +1440,7 @@ specifications. You pass these into the constructor via the
 Option values are accessible through automatically generated getter
 methods:
 
-    $cli->get_foo();
+    $cli->get_foo_bar();
     $cli->get_log_level();
 
 Option names that contain dashes (`-`) are automatically converted to
@@ -1410,21 +1495,22 @@ returns all remaining arguments as a list:
 
 _Note: When called with names, `get_args` returns a hash in list
 context and a hash reference in scalar context._
-&#x3d;head2 set\_args
 
-Resets the positional arguments.
+## set\_args
 
-    $self->set_args(qw(foo 1));
+Replaces the positional argument list with the supplied array
+reference.
+
+    $self->set_args([qw(foo 1)]);
 
 This method overrides the positional arguments originally passed to
-the script. You can achieve the same behavior by calling the
-`get_args` in scalar context and modifying the reference.
+the script. You can also modify individual arguments by retrieving
+the existing array reference using `get_args()` in scalar context:
 
     my $args = $self->get_args;
     $args->[1] = '2';
 
-Use this technique when you want to modify individual arguments
-without replacing the entire argument list.
+This avoids replacing the entire argument list.
 
 # CUSTOM ERROR HANDLER
 
@@ -1454,6 +1540,12 @@ returns a false value, indicating an error while parsing options.
     The error handler is called with the error message from `GetOptions`.
     It must return a boolean: a true value allows processing to continue,
     while a false value causes `CLI::Simple` to exit immediately.
+
+When an `error_handler` callback is supplied, its return value
+determines whether processing continues, regardless of the value
+of `$CLI::Simple::GETOPT_EXIT_ON_ERROR`. Without a callback, the
+global variable controls whether an option-parsing failure causes
+an immediate exit.
 
 # SETTING DEFAULT VALUES FOR OPTIONS
 
@@ -1501,6 +1593,10 @@ Example:
 
 This will generate `get_biz`, `set_biz`, `get_buz`, etc., for
 internal use.
+
+Unlike `option_specs`, `extra_options` does not register
+command-line options. It only creates accessors for values that
+can be initialized or modified programmatically.
 
 # LOGGING
 
@@ -1555,12 +1651,13 @@ that default from the command line, add `color!` to your
       ...
     );
 
-This gives you `--color` and `--no-color` for free. Whichever way
-`use_log4perl()` set the default, an explicit flag on the command
-line always wins; if neither `--color` nor `--no-color` is passed,
-your `use_log4perl()` setting is left alone. Declaring `color!` is
-therefore safe to add at any time - it only changes behavior for
-scripts whose users actually pass the flag.
+This gives you `--color` and `--no-color` for free.  When `color!`
+is declared, `--color` and `--no-color` override the default color
+setting. These switches control `CLI::Simple`'s built-in colorized
+configuration; they do not add coloring to a custom Log4perl
+configuration. Declaring `color!` is therefore safe to add at any
+time - it only changes behavior for scripts whose users actually pass
+the flag.
 
 _Note: `color` and `config` are mutually exclusive -
 `use_log4perl()` dies if you pass both. `color` is specifically for
@@ -1597,6 +1694,14 @@ Example:
       }
     )->run;
 
+Log levels are resolved in the following order of precedence:
+
+- 1. An explicit `--log-level` command-line option
+- 2. The log level associated with the selected command
+- 3. The application default supplied to `use_log4perl()`
+
+The effective level is available through `get_log_level()`.
+
 _TIP: add other elements to the array for your command to process._
 
 _Note: Per-command log levels are not currently supported in the YAML
@@ -1616,10 +1721,15 @@ manifest. Define them programmatically by overriding `main()` if needed._
 
 - Do I need to implement commands?
 
-    No. If your script performs a single operation, you can register
-    a default command:
+    You do not need to define multiple named commands. For an application
+    that performs a single operation, register a default command:
 
         commands => { default => \&main }
+
+    If no command is selected and no default command is registered,
+    `run()` returns successfully without invoking a command handler.
+
+    The application's `init()` method still executes during construction.
 
 - Must I subclass `CLI::Simple`?
 
@@ -1663,23 +1773,15 @@ manifest. Define them programmatically by overriding `main()` if needed._
 
 - How do I enable bash completion for my script?
 
-    Your script must be invoked via a bash modulino wrapper with
-    `MODULINO_WRAPPER` set. Then run:
+    Run the built-in `-generate-completion` command. The script name is
+    taken from `MODULINO_WRAPPER` when set, or derived from the module
+    name otherwise.
 
         my-script -generate-completion > \
           ~/.local/share/bash-completion/completions/my-script
 
     Wrappers generated by [CPAN::Maker::Bootstrapper](https://metacpan.org/pod/CPAN%3A%3AMaker%3A%3ABootstrapper) set
     `MODULINO_WRAPPER` automatically.
-
-- How do I add my own internal commands?
-
-    Add entries to `%INTERNAL_COMMANDS` before calling `new()`:
-
-        our %INTERNAL_COMMANDS = (
-          %CLI::Simple::INTERNAL_COMMANDS,
-          '-my-command' => \&_cmd_my_command,
-        );
 
 - My application dies with "use\_log4perl() requires Log::Log4perl..."
 
@@ -1771,9 +1873,10 @@ After parsing, both `get_config()` and `get_cfg()` will return the
 same value. If the user passes both `--config` and `--cfg`, the value
 from `--config` (the canonical version) is used.
 
-_Note: In role-based applications using a YAML manifest, command
-aliases are expressed by mapping the alias command directly to the
-target sub name rather than a role class. See ["ROLE-BASED ARCHITECTURE"](#role-based-architecture)._
+_Note: Applications using YAML manifests may define command aliases
+through the `alias:` section, just as applications using the
+`alias` constructor parameter do. Aliases resolve to their canonical
+commands before role composition. See ["ROLE-BASED ARCHITECTURE"](#role-based-architecture)._
 
 ## Recommendations
 
@@ -1799,8 +1902,9 @@ non-zero value to indicate failure.
 
 ## Exit Codes
 
-`CLI::Simple` uses conventional exit codes so that calling scripts
-can distinguish between normal completion and error conditions.
+`CLI::Simple` provides conventional success and failure exit codes
+for its own operations. Applications may return additional exit
+codes from their command handlers.
 
 - '0'
 
@@ -1816,6 +1920,10 @@ can distinguish between normal completion and error conditions.
     A command handler may return an application-specific numeric exit
     code, which `run()` passes through to the caller. A handler that
     calls `exit()` terminates the process directly.
+
+Some errors, including unknown commands, raise exceptions rather
+than returning an exit code. Unless caught by the application,
+these exceptions terminate the process with a non-zero status.
 
 # LICENSE AND COPYRIGHT
 

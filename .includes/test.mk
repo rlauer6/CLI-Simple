@@ -11,25 +11,25 @@ test-requires.cpanfile: test-requires
 test-local::
 
 .PHONY: test
-test: $(GSOURCE_FILES) test-local | local/.installed ## run unit tests
+test: $(SOURCE_FILES) test-local | local/.installed ## run unit tests
 	PERL5LIB= prove -I lib -I local/lib/perl5 -v t/
 	test -z "$(AUTHOR_TESTING)" || $(MAKE) test-author
 	test -z "$(RELEASE_TESTING)" || $(MAKE) test-release
 	test -z "$(AUTOMATED_TESTING)" || $(MAKE) test-smoke
 
 .PHONY: test-all
-test-all: $(GSOURCE_FILES) | local/.installed ## run all tests
+test-all: $(SOURCE_FILES) | local/.installed ## run all tests
 	$(MAKE) test \
 	  AUTHOR_TESTING=1 \
 	  RELEASE_TESTING=1 \
 	  AUTOMATED_TESTING=1
 
-check: $(GSOURCE_FILES) ## syntax check and create source from .in file
+check: $(SOURCE_FILES) ## syntax check and create source from .in file
 
 .PHONY: test-author
 test-author:: | local/.installed ## author tests
-	$(NO_ECHO)mkdir -p xt/author; \
-	PERL5LIB= prove -I lib -I local/lib/perl5 -r xt/author
+	$(NO_ECHO)PERL5LIB= \
+	prove $(PERLINCLUDE) -r xt/author
 
 .PHONY: test-release
 test-release:: | local/.installed ## release tests
