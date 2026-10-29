@@ -1,4 +1,5 @@
 package CLI::Simple;
+
 # a Simple, Fast & Easy way to create scripts
 
 use strict;
@@ -22,6 +23,9 @@ use Getopt::Long qw(:config no_ignore_case);
 use IO::Interactive;
 use List::Util qw(none pairs any);
 use Scalar::Util qw(reftype);
+use Role::Tiny::With;
+
+with qw(CLI::Simple::TempFile CLI::Simple::TempDir);
 
 our $VERSION = '@PACKAGE_VERSION@';
 
@@ -314,6 +318,7 @@ sub main {
 my %LOGGER_ENABLED;
 my %OPTION_PROVIDERS;
 my %OPTION_PROVIDER_ORDER;
+my %TEMP_RESOURCE_ACCESSORS;
 
 ########################################################################
 sub _use_logger {
@@ -451,11 +456,12 @@ sub new {
   }
 
   my (
-    $default_options, $option_specs,  $commands, $command_roles,    $manifest_commands, $extra_options,
-    $abbreviations,   $error_handler, $alias,    $validate_command, $help_sections
+    $default_options, $option_specs,  $commands,      $command_roles, $manifest_commands,
+    $extra_options,   $abbreviations, $error_handler, $alias,         $validate_command,
+    $help_sections,   $temp_file,     $temp_dir
     )
     = @args{
-    qw(default_options option_specs commands command_roles manifest_commands extra_options abbreviations error_handler alias validate_command help_sections)
+    qw(default_options option_specs commands command_roles manifest_commands extra_options abbreviations error_handler alias validate_command help_sections temp_file temp_dir)
     };
 
   $validate_command //= $TRUE;
@@ -761,6 +767,8 @@ sub new {
   $self->resolve_option_providers( \%resolved, \@accessors );
   $self->init_defaults( $default_options, \%resolved );
 
+  $self->init_temp_resources( temp_file => $temp_file, temp_dir => $temp_dir );
+
   $self->can('init') && $self->init();
 
   return $self;
@@ -816,6 +824,85 @@ sub resolve_option_providers {
 
       $self->set( $option, $values->{$option} );
       $resolved->{$option} = 1;
+    }
+  }
+
+  return $self;
+}
+
+########################################################################
+sub init_temp_resources {
+########################################################################
+  my ( $self, %specs ) = @_;
+
+  my @resources;
+  my %reserved;
+  my $class = ref $self;
+
+  # Validate the complete declaration before allocating anything.
+  foreach my $kind (qw(temp_dir temp_file)) {
+    my $spec = $specs{$kind};
+    next if !defined $spec || !ref $spec && !$spec;
+
+    my @entries;
+    if ( !ref $spec ) {
+      croak sprintf q{Invalid %s declaration}, $kind
+        if $spec ne q{1};
+      @entries = ( {} );
+    }
+    elsif ( reftype($spec) eq 'HASH' ) {
+      @entries = ($spec);
+    }
+    elsif ( reftype($spec) eq 'ARRAY' ) {
+      @entries = @{$spec};
+    }
+    else {
+      croak sprintf q{Invalid %s declaration}, $kind;
+    }
+
+    foreach my $definition (@entries) {
+      croak sprintf q{%s entries must be hash references}, $kind
+        if !ref $definition || reftype($definition) ne 'HASH';
+
+      my %args         = %{$definition};
+      my $no_accessors = $args{no_accessors} // 0;
+      my $explicit     = exists $args{accessor};
+
+      croak 'accessor and no_accessors cannot be combined'
+        if $no_accessors && $explicit;
+
+      if ( !$no_accessors ) {
+        my $accessor = $args{accessor} // $kind;
+        croak sprintf q{Invalid accessor name: %s}, $accessor
+          if $accessor !~ /\A[a-zA-Z_]\w*\z/;
+
+        croak sprintf q{Duplicate temporary resource accessor: %s}, $accessor
+          if $reserved{$accessor}++;
+
+        foreach my $prefix (qw(get set)) {
+          my $method = $prefix . q{_} . $accessor;
+          croak sprintf q{Temporary resource accessor already exists: %s}, $method
+            if $self->can($method) && !$TEMP_RESOURCE_ACCESSORS{$class}{$method};
+        }
+      }
+
+      push @resources, [ $kind, \%args ];
+    }
+  }
+
+  foreach my $resource (@resources) {
+    my ( $kind, $args ) = @{$resource};
+    if ( $kind eq 'temp_file' ) {
+      $self->create_temp_file( %{$args} );
+    }
+    else {
+      $self->create_temp_dir( %{$args} );
+    }
+
+    if ( !$args->{no_accessors} ) {
+      my $accessor = $args->{accessor} // $kind;
+      $TEMP_RESOURCE_ACCESSORS{$class}{ q{get_} . $accessor } = 1;
+      $TEMP_RESOURCE_ACCESSORS{$class}{ q{set_} . $accessor } = 1;
     }
   }
 
@@ -1265,7 +1352,7 @@ __END__
 
 =head1 NAME
 
-CLI::Simple - a minimalist object oriented base class for CLI applications
+CLI::Simple - a lightweight, low-friction, extensible framework for command-line applications
 
 =head1 SYNOPSIS
 
@@ -1445,6 +1532,8 @@ This documentation refers to version @PACKAGE_VERSION@.
 =item * customizable help sections via C<help_sections>
 
 =item * pluggable option providers with ordered resolution and precedence
+
+=item * automatic temporary file and directory creation with managed cleanup
 
 =back
 
@@ -2163,6 +2252,9 @@ providers. See L</OPTION PROVIDERS> for details.
 
 =back
 
+After C<init()> returns, any remaining undefined options are
+initialized from the C<default_options> passed to the constructor.
+
 =item * B<Phase 3: Execution (C<run>)>
 
 Dispatches to the command method determined during initialization.
@@ -2486,10 +2578,7 @@ separately.
 
 =head2 use_log4perl
 
-  __PACKAGE__->use_log4perl(
-    log_level => 'info',
-    color     => 1,
-  );
+  __PACKAGE__->use_log4perl;
 
 Enables L<Log::Log4perl> integration for the application class.
 C<CLI::Simple> initializes logging during object construction, before
@@ -2531,14 +2620,9 @@ examples, and resolution rules.
 
   new( args )
 
-Instantiates a new C<CLI::Simple> instance, parses command-line options,
-creates the corresponding accessors, and optionally initializes logging.
-Registered option providers are then consulted, application defaults
-are applied, and the application's C<init()> method is invoked, if
-defined.
-
-See L</OPTION PROVIDERS> for details on option resolution and
-precedence.
+Instantiates a new C<CLI::Simple> instance, parses options, optionally
+initializes logging, and makes options available via dynamically
+generated accessors.
 
 I<Note: The C<new()> constructor uses L<Getopt::Long>'s C<GetOptions>,
 which directly modifies C<@ARGV> by removing any recognized
@@ -2597,8 +2681,7 @@ command.
 =item * default_options (optional)
 
 A hash reference providing default values for options. These values
-are applied only when the corresponding option has not been resolved
-by the command line or a registered option provider.
+apply if the corresponding option is not given on the command line.
 
 =item * extra_options (optional)
 
@@ -2777,18 +2860,17 @@ after command-line options and arguments have been processed and
 before command dispatch. Use this method to perform application-specific
 initialization and validation.
 
-The C<init()> method is invoked after command-line options have been
-parsed, registered option providers have resolved any remaining options,
-and application defaults have been applied. Consequently, all resolved
-option values are available through their corresponding accessors when
-C<init()> executes.
+=item * temp_file
 
-Applications may use C<init()> to perform additional initialization,
-including validation of resolved values, establishing connections, or
-preparing resources needed by command handlers.
+Declares one or more temporary files to be created during construction.
+Accepts a boolean, a hash reference, or an array reference of hash
+references. See L</TEMPORARY RESOURCES>.
 
-See L</OPTION PROVIDERS> for details on option resolution and
-precedence.
+=item * temp_dir
+
+Declares one or more temporary directories to be created during
+construction. Accepts the same declaration forms as C<temp_file>.
+See L</TEMPORARY RESOURCES>.
 
 =head1 USING PACKAGE VARIABLES
 
@@ -2974,7 +3056,7 @@ values.
 See L</OPTION PROVIDERS> for details on option resolution and
 precedence.
 
-=head1 OPTION PROVIDERS
+=head2 OPTION PROVIDERS
 
 C<CLI::Simple> supports pluggable option providers that resolve application
 options from sources other than the command line. Providers are implemented
@@ -3022,10 +3104,10 @@ The provider name determines the methods C<CLI::Simple> invokes. For
 example, a provider registered as C<config> implements
 C<_config_resolve()> and may optionally implement C<_config_init()>.
 
-=head2 Implementing an Option Provider
+=head3 Implementing an Option Provider
 
 An option provider is a L<Role::Tiny> role that implements a resolver
-method named C< _foo_config_resolve() >, where I<name> is the name used
+method named C< _I<name>_resolve() >, where I<name> is the name used
 when registering the provider.
 
 For example, the following provider resolves options from a Perl hash:
@@ -3101,7 +3183,7 @@ options to resolve. This allows providers to defer expensive operations,
 such as establishing database connections or initializing AWS clients,
 until they are actually needed.
 
-=head2 Option Resolution and Precedence
+=head3 Option Resolution and Precedence
 
 CLI::Simple resolves option values during object construction, before
 invoking the application's C<init()> method.
@@ -3171,6 +3253,151 @@ internal use.
 Unlike C<option_specs>, C<extra_options> does not register
 command-line options. It only creates accessors for values that
 can be initialized or modified programmatically.
+
+=head1 TEMPORARY RESOURCES
+
+Many command-line applications require temporary files or directories
+for intermediate processing. Traditionally, applications must create
+these resources, retain their paths, and arrange for cleanup when they
+are no longer needed.
+
+C<CLI::Simple> can manage temporary files and directories automatically
+through the C<temp_file> and C<temp_dir> constructor arguments.
+
+Resources are created during object construction, before the application's
+C<init()> method is invoked. Each resource is owned by the application
+instance and, by default, is automatically removed when that instance
+is destroyed.
+
+=head2 Declaring Temporary Resources
+
+For example:
+
+    my $cli = __PACKAGE__->new(
+      temp_dir => {
+        accessor => 'workspace',
+        cleanup  => 1,
+      },
+
+      temp_file => [
+        {
+          accessor => 'report',
+          suffix   => '.csv',
+          cleanup  => 1,
+        },
+        {
+          accessor => 'debug_log',
+          suffix   => '.log',
+          cleanup  => 0,
+        },
+      ],
+
+      commands => {
+        process => \&cmd_process,
+      },
+    );
+
+C<CLI::Simple> creates the resources and generates the corresponding
+accessors in the application class.
+
+The command handler can immediately use them:
+
+    sub cmd_process {
+      my ($self) = @_;
+
+      my $workspace = $self->get_workspace;
+      my $report    = $self->get_report;
+      my $debug_log = $self->get_debug_log;
+
+      # Perform application-specific processing.
+
+      return 0;
+    }
+
+The accessors return pathnames, not filehandles or resource objects.
+
+Both C<temp_file> and C<temp_dir> accept a boolean, a hash reference,
+or an array reference of hash references.
+
+A true value creates one resource using default settings:
+
+    temp_file => 1,
+    temp_dir  => 1,
+
+These declarations generate C<get_temp_file()> and C<get_temp_dir()>
+accessors, respectively. A false value disables resource creation.
+
+A hash reference configures a single resource, while an array reference
+allows multiple resources of the same type. When declaring multiple
+resources, specify distinct accessor names to expose their paths
+independently.
+
+=head2 Resource Attributes
+
+The following attributes are supported by both temporary resource
+types:
+
+=over 4
+
+=item * C<accessor>
+
+Specifies the name used to generate the C<get_> and C<set_> accessors.
+Defaults to C<temp_file> or C<temp_dir>, respectively.
+
+=item * C<cleanup>
+
+Controls automatic cleanup. Defaults to true. When false, the resource
+remains on disk after the owning object is destroyed.
+
+=item * C<dir>
+
+Specifies the parent directory in which the temporary resource is
+created. It does not specify the generated resource's pathname.
+
+=item * C<template>
+
+Specifies the naming template used by L<File::Temp>.
+
+=item * C<no_accessors>
+
+Disables automatic accessor generation when true. Cannot be combined
+with C<accessor>.
+
+=back
+
+Temporary files additionally support C<suffix>, which appends a
+specified suffix to the generated filename.
+
+=head2 Resource Ownership and Cleanup
+
+Each application instance owns the temporary files and directories it
+creates. Resource ownership is independent of the generated accessors.
+
+Changing an accessor value does not change which resource the framework
+owns or which resource will be cleaned up.
+
+When C<cleanup> is enabled, resources are normally removed when the
+owning object is destroyed. For temporary directories, this includes
+B<all files and subdirectories contained within them>.
+
+Use C<cleanup =E<gt> 0> for resources that must survive application
+object destruction.
+
+Cleanup follows normal Perl object-lifetime semantics and cannot be
+guaranteed after abrupt process termination.
+
+=head2 Using the Roles Independently
+
+The functionality is provided by L<CLI::Simple::TempFile> and
+L<CLI::Simple::TempDir>, both implemented as L<Role::Tiny> roles.
+
+These roles can also be composed into classes that do not use
+C<CLI::Simple>. They expose C<create_temp_file()> and
+C<create_temp_dir()>, respectively, and provide the same ownership
+and optional accessor behavior.
+
+See L<CLI::Simple::TempFile> and L<CLI::Simple::TempDir> for complete
+attribute descriptions and standalone usage examples.
 
 =head1 LOGGING
 

@@ -12,13 +12,19 @@ You may receive some or all of these files:
 - `release-X.Y.Z.lst`: file inventory and comparison context
 - existing `ChangeLog`: formatting, terminology, and editorial precedent
 
-Each source has a distinct purpose. Do not infer a file's Git status from its content, the diff, or the apparent novelty of a feature. If a diff and the final tarball differ, describe the implementation in the tarball. Do not invent facts that the artifacts do not establish.
+Each source has a distinct purpose. Do not infer a file's Git status
+from its content, the diff, or the apparent novelty of a feature. If a
+diff and the final tarball differ, describe the implementation in the
+tarball. Do not invent facts that the artifacts do not establish.
 
 OUTPUT FORMAT
 
-Output only the finished ChangeLog entry. No introductory commentary, explanations, Markdown fences, or text before or after the entry.
+Output only the finished ChangeLog entry. No introductory commentary,
+explanations, Markdown fences, or text before or after the entry.
 
-Match the existing ChangeLog's indentation, capitalization, headings, and notation. The result is a technical, file-oriented engineering ledger, not release-note prose.
+Match the existing ChangeLog's indentation, capitalization, headings,
+and notation. The result is a technical, file-oriented engineering
+ledger, not release-note prose.
 
 Use this general structure:
 
@@ -38,12 +44,15 @@ Use this general structure:
         - +New::Dependency 1.23
         - bump Existing::Dependency to 2.0
 
-The date/author line is illustrative. Include it only when the necessary metadata is explicitly supplied; otherwise begin with the version heading. Never invent a timestamp or author.
+The date/author line is illustrative. Include it only when the
+necessary metadata is explicitly supplied; otherwise begin with the
+version heading. Never invent a timestamp or author.
 
 - Begin each file entry with `* path/to/file` and use indented `-` lines for its changes.
 - Mark files with status A as `* path/to/file: new`. Never mark a file with status M as new, even if its functionality is new.
 - Identify affected methods, Make targets, recipes, or logical sections on separate parenthesized lines when that improves precision; do not list every changed subroutine mechanically.
 - Keep each entry on a single physical line. Do not wrap descriptions.
+- Try to keep explanation of change short, do not chain changes using ; put them on separate lines
 - Use concise implementation language, such as `lazy load HTTP::Tiny`, `add --file-list support`, or `avoid rewriting unchanged dependency files`. Avoid marketing claims or generic benefits.
 - For dependencies, use compact notation such as `+File::Which 1.27`, `+Perl::Tidy suggests`, or `bump CLI::Simple to 2.3.0`.
 - Identify generated artifacts succinctly, e.g., `* README.md: generated`.

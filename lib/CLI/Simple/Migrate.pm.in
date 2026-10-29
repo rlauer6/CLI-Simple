@@ -12,6 +12,8 @@ use English qw(-no_match_vars);
 use parent qw(Exporter);
 our @EXPORT_OK = qw(_cmd_migrate);
 
+our $VERSION = '@PACKAGE_VERSION@';
+
 ########################################################################
 sub _cmd_migrate {
 ########################################################################

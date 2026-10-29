@@ -62,10 +62,15 @@
   * [set\_args](#set\args)
 * [CUSTOM ERROR HANDLER](#custom-error-handler)
 * [SETTING DEFAULT VALUES FOR OPTIONS](#setting-default-values-for-options)
-* [OPTION PROVIDERS](#option-providers)
-  * [Implementing an Option Provider](#implementing-an-option-provider)
-  * [Option Resolution and Precedence](#option-resolution-and-precedence)
+  * [OPTION PROVIDERS](#option-providers)
+    * [Implementing an Option Provider](#implementing-an-option-provider)
+    * [Option Resolution and Precedence](#option-resolution-and-precedence)
 * [ADDING ADDITIONAL ACCESSORS](#adding-additional-accessors)
+* [TEMPORARY RESOURCES](#temporary-resources)
+  * [Declaring Temporary Resources](#declaring-temporary-resources)
+  * [Resource Attributes](#resource-attributes)
+  * [Resource Ownership and Cleanup](#resource-ownership-and-cleanup)
+  * [Using the Roles Independently](#using-the-roles-independently)
 * [LOGGING](#logging)
   * [Colored Output](#colored-output)
   * [Per Command Log Levels](#per-command-log-levels)
@@ -80,9 +85,10 @@
 * [LICENSE AND COPYRIGHT](#license-and-copyright)
 * [SEE ALSO](#see-also)
 * [AUTHOR](#author)
+* [POD ERRORS](#pod-errors)
 # NAME
 
-CLI::Simple - a minimalist object oriented base class for CLI applications
+CLI::Simple - a lightweight, low-friction, extensible framework for command-line applications
 
 # SYNOPSIS
 
@@ -227,7 +233,7 @@ its values.
 
 # VERSION
 
-This documentation refers to version 2.4.0.
+This documentation refers to version 2.5.0.
 
 # FEATURES
 
@@ -244,6 +250,7 @@ This documentation refers to version 2.4.0.
 - optional pager support for help output via [IO::Pager](https://metacpan.org/pod/IO%3A%3APager)
 - customizable help sections via `help_sections`
 - pluggable option providers with ordered resolution and precedence
+- automatic temporary file and directory creation with managed cleanup
 
 # QUICK START
 
@@ -915,6 +922,9 @@ For interactive CLI handling or complex command trees, consider
     - Overriding default options
     - Performing any setup required **before** a command is run.
 
+    After `init()` returns, any remaining undefined options are
+    initialized from the `default_options` passed to the constructor.
+
 - **Phase 3: Execution (`run`)**
 
     Dispatches to the command method determined during initialization.
@@ -1206,10 +1216,7 @@ separately.
 
 ## use\_log4perl
 
-    __PACKAGE__->use_log4perl(
-      log_level => 'info',
-      color     => 1,
-    );
+    __PACKAGE__->use_log4perl;
 
 Enables [Log::Log4perl](https://metacpan.org/pod/Log%3A%3ALog4perl) integration for the application class.
 `CLI::Simple` initializes logging during object construction, before
@@ -1251,14 +1258,9 @@ examples, and resolution rules.
 
     new( args )
 
-Instantiates a new `CLI::Simple` instance, parses command-line options,
-creates the corresponding accessors, and optionally initializes logging.
-Registered option providers are then consulted, application defaults
-are applied, and the application's `init()` method is invoked, if
-defined.
-
-See ["OPTION PROVIDERS"](#option-providers) for details on option resolution and
-precedence.
+Instantiates a new `CLI::Simple` instance, parses options, optionally
+initializes logging, and makes options available via dynamically
+generated accessors.
 
 _Note: The `new()` constructor uses [Getopt::Long](https://metacpan.org/pod/Getopt%3A%3ALong)'s `GetOptions`,
 which directly modifies `@ARGV` by removing any recognized
@@ -1315,8 +1317,7 @@ name and its arguments._
 - default\_options (optional)
 
     A hash reference providing default values for options. These values
-    are applied only when the corresponding option has not been resolved
-    by the command line or a registered option provider.
+    apply if the corresponding option is not given on the command line.
 
 - extra\_options (optional)
 
@@ -1483,18 +1484,17 @@ after command-line options and arguments have been processed and
 before command dispatch. Use this method to perform application-specific
 initialization and validation.
 
-The `init()` method is invoked after command-line options have been
-parsed, registered option providers have resolved any remaining options,
-and application defaults have been applied. Consequently, all resolved
-option values are available through their corresponding accessors when
-`init()` executes.
+- temp\_file
 
-Applications may use `init()` to perform additional initialization,
-including validation of resolved values, establishing connections, or
-preparing resources needed by command handlers.
+    Declares one or more temporary files to be created during construction.
+    Accepts a boolean, a hash reference, or an array reference of hash
+    references. See ["TEMPORARY RESOURCES"](#temporary-resources).
 
-See ["OPTION PROVIDERS"](#option-providers) for details on option resolution and
-precedence.
+- temp\_dir
+
+    Declares one or more temporary directories to be created during
+    construction. Accepts the same declaration forms as `temp_file`.
+    See ["TEMPORARY RESOURCES"](#temporary-resources).
 
 # USING PACKAGE VARIABLES
 
@@ -1669,7 +1669,7 @@ values.
 See ["OPTION PROVIDERS"](#option-providers) for details on option resolution and
 precedence.
 
-# OPTION PROVIDERS
+## OPTION PROVIDERS
 
 `CLI::Simple` supports pluggable option providers that resolve application
 options from sources other than the command line. Providers are implemented
@@ -1717,10 +1717,10 @@ The provider name determines the methods `CLI::Simple` invokes. For
 example, a provider registered as `config` implements
 `_config_resolve()` and may optionally implement `_config_init()`.
 
-## Implementing an Option Provider
+### Implementing an Option Provider
 
 An option provider is a [Role::Tiny](https://metacpan.org/pod/Role%3A%3ATiny) role that implements a resolver
-method named ` _foo_config_resolve() `, where _name_ is the name used
+method named ` __name__resolve() `, where _name_ is the name used
 when registering the provider.
 
 For example, the following provider resolves options from a Perl hash:
@@ -1796,7 +1796,7 @@ options to resolve. This allows providers to defer expensive operations,
 such as establishing database connections or initializing AWS clients,
 until they are actually needed.
 
-## Option Resolution and Precedence
+### Option Resolution and Precedence
 
 CLI::Simple resolves option values during object construction, before
 invoking the application's `init()` method.
@@ -1862,6 +1862,147 @@ internal use.
 Unlike `option_specs`, `extra_options` does not register
 command-line options. It only creates accessors for values that
 can be initialized or modified programmatically.
+
+# TEMPORARY RESOURCES
+
+Many command-line applications require temporary files or directories
+for intermediate processing. Traditionally, applications must create
+these resources, retain their paths, and arrange for cleanup when they
+are no longer needed.
+
+`CLI::Simple` can manage temporary files and directories automatically
+through the `temp_file` and `temp_dir` constructor arguments.
+
+Resources are created during object construction, before the application's
+`init()` method is invoked. Each resource is owned by the application
+instance and, by default, is automatically removed when that instance
+is destroyed.
+
+## Declaring Temporary Resources
+
+For example:
+
+    my $cli = __PACKAGE__->new(
+      temp_dir => {
+        accessor => 'workspace',
+        cleanup  => 1,
+      },
+
+      temp_file => [
+        {
+          accessor => 'report',
+          suffix   => '.csv',
+          cleanup  => 1,
+        },
+        {
+          accessor => 'debug_log',
+          suffix   => '.log',
+          cleanup  => 0,
+        },
+      ],
+
+      commands => {
+        process => \&cmd_process,
+      },
+    );
+
+`CLI::Simple` creates the resources and generates the corresponding
+accessors in the application class.
+
+The command handler can immediately use them:
+
+    sub cmd_process {
+      my ($self) = @_;
+
+      my $workspace = $self->get_workspace;
+      my $report    = $self->get_report;
+      my $debug_log = $self->get_debug_log;
+
+      # Perform application-specific processing.
+
+      return 0;
+    }
+
+The accessors return pathnames, not filehandles or resource objects.
+
+Both `temp_file` and `temp_dir` accept a boolean, a hash reference,
+or an array reference of hash references.
+
+A true value creates one resource using default settings:
+
+    temp_file => 1,
+    temp_dir  => 1,
+
+These declarations generate `get_temp_file()` and `get_temp_dir()`
+accessors, respectively. A false value disables resource creation.
+
+A hash reference configures a single resource, while an array reference
+allows multiple resources of the same type. When declaring multiple
+resources, specify distinct accessor names to expose their paths
+independently.
+
+## Resource Attributes
+
+The following attributes are supported by both temporary resource
+types:
+
+- `accessor`
+
+    Specifies the name used to generate the `get_` and `set_` accessors.
+    Defaults to `temp_file` or `temp_dir`, respectively.
+
+- `cleanup`
+
+    Controls automatic cleanup. Defaults to true. When false, the resource
+    remains on disk after the owning object is destroyed.
+
+- `dir`
+
+    Specifies the parent directory in which the temporary resource is
+    created. It does not specify the generated resource's pathname.
+
+- `template`
+
+    Specifies the naming template used by [File::Temp](https://metacpan.org/pod/File%3A%3ATemp).
+
+- `no_accessors`
+
+    Disables automatic accessor generation when true. Cannot be combined
+    with `accessor`.
+
+Temporary files additionally support `suffix`, which appends a
+specified suffix to the generated filename.
+
+## Resource Ownership and Cleanup
+
+Each application instance owns the temporary files and directories it
+creates. Resource ownership is independent of the generated accessors.
+
+Changing an accessor value does not change which resource the framework
+owns or which resource will be cleaned up.
+
+When `cleanup` is enabled, resources are normally removed when the
+owning object is destroyed. For temporary directories, this includes
+**all files and subdirectories contained within them**.
+
+Use `cleanup => 0` for resources that must survive application
+object destruction.
+
+Cleanup follows normal Perl object-lifetime semantics and cannot be
+guaranteed after abrupt process termination.
+
+## Using the Roles Independently
+
+The functionality is provided by [CLI::Simple::TempFile](https://metacpan.org/pod/CLI%3A%3ASimple%3A%3ATempFile) and
+[CLI::Simple::TempDir](https://metacpan.org/pod/CLI%3A%3ASimple%3A%3ATempDir), both implemented as [Role::Tiny](https://metacpan.org/pod/Role%3A%3ATiny) roles.
+
+These roles can also be composed into classes that do not use
+`CLI::Simple`. They expose `create_temp_file()` and
+`create_temp_dir()`, respectively, and provide the same ownership
+and optional accessor behavior.
+
+See [CLI::Simple::TempFile](https://metacpan.org/pod/CLI%3A%3ASimple%3A%3ATempFile) and [CLI::Simple::TempDir](https://metacpan.org/pod/CLI%3A%3ASimple%3A%3ATempDir) for complete
+attribute descriptions and standalone usage examples.
 
 # LOGGING
 
@@ -2205,3 +2346,15 @@ under the same terms as Perl itself.  See
 # AUTHOR
 
 Rob Lauer - <rlauer@treasurersbriefcase.com>
+
+# POD ERRORS
+
+Hey! **The above document had some coding errors, which are explained below:**
+
+- Around line 2863:
+
+    '=item' outside of any '=over'
+
+- Around line 2875:
+
+    You forgot a '=back' before '=head1'

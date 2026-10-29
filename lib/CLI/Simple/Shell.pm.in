@@ -3,6 +3,8 @@ package CLI::Simple::Shell;
 use strict;
 use warnings;
 
+our $VERSION = '@PACKAGE_VERSION@';
+
 1;
 
 __END__

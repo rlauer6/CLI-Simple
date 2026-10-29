@@ -11,6 +11,8 @@ use parent qw(Exporter);
 
 our @EXPORT_OK = qw(_cmd_scaffold);
 
+our $VERSION = '@PACKAGE_VERSION@';
+
 ########################################################################
 sub _cmd_scaffold {
 ########################################################################
