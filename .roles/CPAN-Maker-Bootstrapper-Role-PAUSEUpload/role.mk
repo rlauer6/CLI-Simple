@@ -1,4 +1,4 @@
-# -*- mode: sh; -*-
+# -*- mode: makefile; -*-
 
 export PAUSE_USER
 export PAUSE_PASSWORD
@@ -15,9 +15,13 @@ publish: $(TARBALL) pre-publish ## publish a distribution to CPAN (make publish 
 	cd "$$workdir"/*; \
 	perl Makefile.PL; \
 	make test; \
-	$(BOOTSTRAPPER) publish-to-cpan $$tarball
+	cd "$(CURDIR)"; \
+	$(BOOTSTRAPPER) publish-to-cpan $$tarball; \
 	$(MAKE) post-publish
 
 pre-publish::
 
 post-publish::
+
+post-update::
+	rm -f .includes/publish.mk

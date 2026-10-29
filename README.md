@@ -26,7 +26,6 @@
   * [The Inherited main()](#the-inherited-main)
   * [Distributing the Manifest](#distributing-the-manifest)
 * [PHILOSOPHY AND DESIGN PRINCIPLES](#philosophy-and-design-principles)
-  * [Not a Framework](#not-a-framework)
   * [Validation, Defaults, and Configuration](#validation-defaults-and-configuration)
   * [When to Use](#when-to-use)
   * [The init-run Lifecycle](#the-init-run-lifecycle)
@@ -43,6 +42,8 @@
   * [-scaffold](#-scaffold)
   * [-migrate](#-migrate)
 * [METHODS AND SUBROUTINES](#methods-and-subroutines)
+  * [use\_log4perl](#use\log4perl)
+  * [use\_options](#use\options)
   * [new](#new)
   * [command](#command)
   * [command\_args](#command\args)
@@ -61,6 +62,9 @@
   * [set\_args](#set\args)
 * [CUSTOM ERROR HANDLER](#custom-error-handler)
 * [SETTING DEFAULT VALUES FOR OPTIONS](#setting-default-values-for-options)
+* [OPTION PROVIDERS](#option-providers)
+  * [Implementing an Option Provider](#implementing-an-option-provider)
+  * [Option Resolution and Precedence](#option-resolution-and-precedence)
 * [ADDING ADDITIONAL ACCESSORS](#adding-additional-accessors)
 * [LOGGING](#logging)
   * [Colored Output](#colored-output)
@@ -207,9 +211,23 @@ command. The original `commands` form remains supported for backward
 compatibility and retains its original behavior of composing the complete
 set of command roles.
 
+Version 2.4.0 introduces pluggable option providers. CLI applications
+frequently obtain option values from multiple sources, including the
+command line, environment variables, configuration files, and credential
+stores. Traditionally, each application must implement its own logic
+for retrieving these values and determining their precedence, often
+duplicating much of the same code in its `init()` method.
+
+Option providers move that responsibility into reusable [Role::Tiny](https://metacpan.org/pod/Role%3A%3ATiny)
+roles. Applications register the providers they need, in precedence
+order, and `CLI::Simple` coordinates resolution of options not supplied
+on the command line. This eliminates repetitive initialization logic
+while leaving each provider responsible for how and where it obtains
+its values.
+
 # VERSION
 
-This documentation refers to version 2.3.2.
+This documentation refers to version 2.4.0.
 
 # FEATURES
 
@@ -225,6 +243,7 @@ This documentation refers to version 2.3.2.
 - bash completion script generation for modulino wrappers
 - optional pager support for help output via [IO::Pager](https://metacpan.org/pod/IO%3A%3APager)
 - customizable help sections via `help_sections`
+- pluggable option providers with ordered resolution and precedence
 
 # QUICK START
 
@@ -794,23 +813,28 @@ merging behavior.
 
 # PHILOSOPHY AND DESIGN PRINCIPLES
 
-`CLI::Simple` is intentionally minimalist. It provides just enough
-structure to build command-line tools with subcommands, option
-parsing, and help handling -- but without enforcing any particular
-framework or lifecycle.
+Getting started with `CLI::Simple` is intentionally simple.
+It provides a structured, convention-based approach to building
+command-line applications, including option parsing, command
+dispatch, defaults, logging, and help handling, without requiring
+developers to adopt its optional role-based framework.
 
-## Not a Framework
+For a single-module application, you register commands directly
+using the `commands` constructor parameter. Command handlers
+can be implemented as methods or subroutines, allowing you to
+organize application logic according to your own conventions.
 
-This module is not [App::Cmd](https://metacpan.org/pod/App%3A%3ACmd), [MooseX::Getopt](https://metacpan.org/pod/MooseX%3A%3AGetopt), or a full
-application toolkit.  Instead, it offers:
+For applications that need greater modularity, `CLI::Simple` also
+provides an optional role-based framework. YAML manifests
+declare commands, options, and the roles required to implement
+them. The framework manages manifest loading and role composition,
+including selective composition of the roles required by a
+particular command.
 
-- An object-oriented base class with a clean `run()` dispatcher
-- Command-line parsing via `Getopt::Long`
-- Built-in logging via `Log::Log4perl`
-- Subclass hooks like `init()` for setup and validation
-- Optional role-based architecture via YAML manifest for larger applications
+You can use `CLI::Simple` without adopting the role-based framework.
 
-The philosophy is: provide just enough infrastructure, then get out of your way.
+The philosophy is: provide just enough infrastructure, then get out of
+your way.
 
 ## Validation, Defaults, and Configuration
 
@@ -867,23 +891,29 @@ For interactive CLI handling or complex command trees, consider
 
 - **Phase 2: Initialization (`new`)**
 
-    The constructor parses command-line arguments via `Getopt::Long`,
-    creates accessors for all options, initializes logging if enabled,
-    calls `init()` and then initializes any defaults option values
-    you passed to the constructor.
+    The constructor parses command-line arguments using [Getopt::Long](https://metacpan.org/pod/Getopt%3A%3ALong),
+    normalizes option names, and creates accessors for the declared options.
+    After completing command and logger initialization, `CLI::Simple` resolves
+    any remaining options through registered option providers, applies
+    application defaults, and invokes the application's `init()` method,
+    if defined.
 
-    Inside `init()`, your application has full access to the parsed
-    options and arguments. This phase is the ideal hook for all final
-    setup tasks, such as:
+    The order of initialization is significant. Command-line values take
+    precedence over provider-supplied values, providers are consulted in
+    registration order, and defaults are applied only to options that remain
+    unresolved. By the time `init()` is called, all available option values
+    have been assigned to their respective accessors.
+
+    The `init()` method remains available for application-specific
+    initialization, but applications no longer need to implement their own
+    option-source resolution and precedence logic when using option
+    providers. See ["OPTION PROVIDERS"](#option-providers) for details.
 
     - Validating command-line arguments.
     - Loading configuration files based on a `--config` option.
     - Dynamically overriding the command (e.g., `$self->command('new_default')`).
     - Overriding default options
     - Performing any setup required **before** a command is run.
-
-    After `init()` returns, any remaining undefined options are
-    initialized from the `default_options` passed to the constructor.
 
 - **Phase 3: Execution (`run`)**
 
@@ -928,7 +958,7 @@ a role directly:
 The following package variables control automatic command selection,
 help behavior, and output paging.
 
-By default, the framework provides no default command as explained in
+By default, the `CLI::Simple` provides no default command as explained in
 the sections above. Some scripters may want default behaviors that
 assume a command or provide usage if no command is provided.
 
@@ -1174,13 +1204,61 @@ separately.
 
 # METHODS AND SUBROUTINES
 
+## use\_log4perl
+
+    __PACKAGE__->use_log4perl(
+      log_level => 'info',
+      color     => 1,
+    );
+
+Enables [Log::Log4perl](https://metacpan.org/pod/Log%3A%3ALog4perl) integration for the application class.
+`CLI::Simple` initializes logging during object construction, before
+invoking the application's `init()` method.
+
+See ["LOGGING"](#logging) for configuration and usage details.
+
+## use\_options
+
+    __PACKAGE__->use_options(
+      provider_name => {
+        'Provider::Role' => [qw(option1 option2)],
+      },
+    );
+
+Registers one or more option providers with the application class.
+Each provider is identified by a name and implemented as a
+[Role::Tiny](https://metacpan.org/pod/Role%3A%3ATiny) role, which `CLI::Simple` composes into the application
+class.
+
+Providers are registered in the order supplied. This order determines
+their precedence when multiple providers can resolve the same option.
+
+The array reference specifies which application options the provider
+may resolve. An empty array reference allows the provider to resolve
+any eligible application option declared through `option_specs` or
+`extra_options`.
+
+The provider must implement a resolver method named
+`_provider_name_resolve()` and may optionally implement
+`_provider_name_init()`.
+
+Returns the application class.
+
+See ["OPTION PROVIDERS"](#option-providers) for the complete provider contract,
+examples, and resolution rules.
+
 ## new
 
     new( args )
 
-Instantiates a new `CLI::Simple` instance, parses options, optionally
-initializes logging, and makes options available via dynamically
-generated accessors.
+Instantiates a new `CLI::Simple` instance, parses command-line options,
+creates the corresponding accessors, and optionally initializes logging.
+Registered option providers are then consulted, application defaults
+are applied, and the application's `init()` method is invoked, if
+defined.
+
+See ["OPTION PROVIDERS"](#option-providers) for details on option resolution and
+precedence.
 
 _Note: The `new()` constructor uses [Getopt::Long](https://metacpan.org/pod/Getopt%3A%3ALong)'s `GetOptions`,
 which directly modifies `@ARGV` by removing any recognized
@@ -1237,7 +1315,8 @@ name and its arguments._
 - default\_options (optional)
 
     A hash reference providing default values for options. These values
-    apply if the corresponding option is not given on the command line.
+    are applied only when the corresponding option has not been resolved
+    by the command line or a registered option provider.
 
 - extra\_options (optional)
 
@@ -1404,6 +1483,19 @@ after command-line options and arguments have been processed and
 before command dispatch. Use this method to perform application-specific
 initialization and validation.
 
+The `init()` method is invoked after command-line options have been
+parsed, registered option providers have resolved any remaining options,
+and application defaults have been applied. Consequently, all resolved
+option values are available through their corresponding accessors when
+`init()` executes.
+
+Applications may use `init()` to perform additional initialization,
+including validation of resolved values, establishing connections, or
+preparing resources needed by command handlers.
+
+See ["OPTION PROVIDERS"](#option-providers) for details on option resolution and
+precedence.
+
 # USING PACKAGE VARIABLES
 
 The `default_options`, `extra_options`, `option_specs`, and
@@ -1567,6 +1659,179 @@ Example:
 Defaulted options are accessible through their corresponding getter
 methods, just like options set via the command line.
 
+Default values are applied after command-line arguments have been parsed
+and registered option providers have been consulted. A default is used
+only when the corresponding option remains unresolved. Consequently,
+values supplied by option providers take precedence over application
+defaults, just as command-line values take precedence over provider
+values.
+
+See ["OPTION PROVIDERS"](#option-providers) for details on option resolution and
+precedence.
+
+# OPTION PROVIDERS
+
+`CLI::Simple` supports pluggable option providers that resolve application
+options from sources other than the command line. Providers are implemented
+as [Role::Tiny](https://metacpan.org/pod/Role%3A%3ATiny) roles and registered using the `use_options()` class
+method.
+
+Option providers separate the source of an option's value from its
+use within the application. Regardless of whether an option was supplied
+on the command line, retrieved from a configuration file, or resolved
+by another provider, application code accesses it through the same
+`get_` and `set_` accessors.
+
+This makes the accessors the application's consistent interface to
+option values, eliminating the need for application code to know
+where those values originated or how precedence was established.
+
+An application can register one or more providers:
+
+    __PACKAGE__->use_options(
+      environment => {
+        'CLI::Simple::Role::Environment' => [],
+      },
+      config => {
+        'MyApp::Role::Config' => [qw(host port database)],
+      },
+      secrets_manager => {
+        'CLI::Simple::Role::SecretsManager' => [qw(database_password api_key)],
+      },
+    );
+
+Each registration consists of a provider name, a role implementing the
+provider, and an array reference identifying the application options
+the provider may resolve.
+
+Providers are consulted in registration order. When multiple providers
+declare the same option, the first provider to successfully resolve it
+takes precedence. Subsequent providers are asked to resolve only those
+options that remain unresolved.
+
+An empty option list indicates that the provider may resolve any
+unresolved application option declared through `option_specs` or
+`extra_options`.
+
+The provider name determines the methods `CLI::Simple` invokes. For
+example, a provider registered as `config` implements
+`_config_resolve()` and may optionally implement `_config_init()`.
+
+## Implementing an Option Provider
+
+An option provider is a [Role::Tiny](https://metacpan.org/pod/Role%3A%3ATiny) role that implements a resolver
+method named ` _foo_config_resolve() `, where _name_ is the name used
+when registering the provider.
+
+For example, the following provider resolves options from a Perl hash:
+
+    package Foo::Config;
+
+    use strict;
+    use warnings;
+
+    use Role::Tiny;
+
+    our %FOO_CONFIG = (
+      foo => 'bar',
+    );
+
+    sub _foo_config_resolve {
+      my ( $self, @names ) = @_;
+
+      my %values;
+
+      foreach my $name (@names) {
+        next if !exists $FOO_CONFIG{$name};
+
+        $values{$name} = $FOO_CONFIG{$name};
+      }
+
+      return \%values;
+    }
+
+    1;
+
+The application registers the provider using `use_options()`:
+
+    package Foo;
+
+    use parent qw(CLI::Simple);
+
+    __PACKAGE__->use_options(
+      foo_config => {
+        'Foo::Config' => [qw(foo)],
+      },
+    );
+
+    # In the application's main() method:
+    my $cli = __PACKAGE__->new(
+      option_specs => ['foo|f=s'],
+    );
+
+Once registered, `CLI::Simple` composes the role into the application class
+and invokes `_foo_config_resolve()` when `foo` has not been supplied on
+the command line. The resolved value is available through the normal
+`get_foo()` accessor.
+
+The resolver receives the names of the application options that remain
+unresolved and returns a hash reference containing the values it can
+supply. The returned keys must be the application option names, regardless
+of how the values are represented in the underlying source.
+
+For example, a provider might resolve the application option `foo`
+from an environment variable or configuration entry named `FOO_TASTIC`.
+Any such translation is the responsibility of the provider.
+
+An option is considered resolved when its name exists as a key in the
+returned hash reference. Values of `undef`, `0`, and the empty string
+are valid resolved values. Options omitted from the returned hash
+reference remain unresolved and may be supplied by subsequent providers
+or application defaults.
+
+A provider may also implement an optional initialization method named
+` __name__init() `. `CLI::Simple` invokes this method before the
+provider's resolver, but only when the provider has eligible unresolved
+options to resolve. This allows providers to defer expensive operations,
+such as establishing database connections or initializing AWS clients,
+until they are actually needed.
+
+## Option Resolution and Precedence
+
+CLI::Simple resolves option values during object construction, before
+invoking the application's `init()` method.
+
+Options are resolved in the following order:
+
+- 1. Command-line arguments
+
+    Values supplied on the command line take precedence over all providers.
+    Options already supplied on the command line are not passed to providers.
+
+- 2. Registered option providers
+
+    Providers are consulted in registration order. Each provider receives
+    only the eligible option names that remain unresolved.
+
+    A provider resolves an option by including its name in the hash reference
+    returned by its resolver. Options omitted from that hash reference remain
+    eligible for subsequent providers.
+
+    When a provider has no eligible unresolved options, neither its optional
+    initializer nor its resolver is invoked.
+
+- 3. Application defaults
+
+    Any remaining unresolved options may be initialized from the application's
+    `default_options`.
+
+After resolution and default initialization are complete, `CLI::Simple`
+invokes the application's `init()` method, if defined.
+
+Consequently, application initialization and command handlers can access
+resolved option values through their normal accessors without needing
+to know which source supplied them.
+
 # ADDING ADDITIONAL ACCESSORS
 
 All command-line options are automatically available through getter
@@ -1612,7 +1877,7 @@ through `use_log4perl()`.
     );
 
 If you do not explicitly include a `log-level` option in your
-`option_specs`, CLI::Simple will automatically add one for you.
+`option_specs`, `CLI::Simple` will automatically add one for you.
 
 Once enabled, you can access the logger instance via:
 

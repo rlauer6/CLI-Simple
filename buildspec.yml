@@ -16,6 +16,7 @@ path:
 extra-files:
   - ChangeLog
   - README.md
+  - release-notes.md
   - t/lib:
     - t/lib/CLISimpleHelpBoth.pm
     - t/lib/CLISimpleHelpSynopsis.pm
