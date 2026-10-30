@@ -1,3 +1,44 @@
+Thu Oct 29 16:27:47 2026  Rob Lauer  <rclauer@gmail.com>
+
+	[2.6.0]:
+	* VERSION: bump
+	* README.md: generated
+	* deps.mk
+	- +CLI::Simple::Options, CLI::Simple::TempDir, CLI::Simple::TempFile dependencies for CLI::Simple
+	* lib/CLI/Simple/Constants.pm.in
+	(@VALID_OPTIONS): +options
+	* lib/CLI/Simple.pm.in
+	- compose CLI::Simple::Options role via Role::Tiny::With
+	- add options to constructor argument destructuring as $option_declarations
+	- croak if both options and option_specs are supplied
+	- call normalize_option_specs() on options or option_specs to extract specs and metadata hash
+	- store option metadata on instance as _cli_simple_option_metadata
+	- call validate_options() and finalize_options() after init_defaults() and before init_temp_resources()
+	* lib/CLI/Simple/Options.pm.in: new
+	- Role::Tiny role providing normalize_option_specs(), validate_options(), and finalize_options()
+	- normalize_option_specs() accepts array ref (plain specs) or hash ref (specs with metadata); returns normalized spec array and metadata hash
+	- infers option type from Getopt::Long spec suffix; recognizes file and directory semantic types
+	- validate_options() checks required, min, max, min_length, max_length, enum, and file/directory path constraints after all option sources have been resolved
+	- skips validation and finalization for undefined optional options
+	- finalize_options() invokes per-option finalize callback, passing the application instance and validated value; stores return value back to accessor
+	- slurp => 1 reads file contents before invoking any custom finalizer; accessor contains file contents when no finalizer is declared
+	* t/13-options-normalization.t: new
+	- test normalize_option_specs() with array ref and hash ref inputs; verify spec extraction and metadata passthrough
+	* t/14-options-constructor.t: new
+	- test options constructor argument: accepted as hash ref with metadata; rejects simultaneous options and option_specs
+	* t/15-options-validation.t: new
+	- test validate_options(): required, min, max, min_length, max_length, enum, file, and directory constraints
+	* t/16-options-validation-constructor.t: new
+	- test validation constraints applied via constructor options argument
+	* t/17-options-finalization.t: new
+	- test finalize callback invoked with application instance and validated value; return value replaces accessor
+	* t/18-options-finalization-constructor.t: new
+	- test finalization behavior applied via constructor options argument
+	* t/19-options-slurp.t: new
+	- test slurp => 1 reads file contents into accessor before finalizer is called
+	* t/20-options-slurp-constructor.t: new
+	- test slurp behavior applied via constructor options argument
+
 Thu Oct 29 12:27:44 2026  Rob Lauer  <rclauer@gmail.com>
 
 	[2.5.0]:

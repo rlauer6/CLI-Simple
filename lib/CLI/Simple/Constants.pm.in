@@ -134,6 +134,7 @@ Readonly::Array our @VALID_OPTIONS => qw(
   extra_options
   manifest_commands
   option_specs
+  options
   temp_dir
   temp_file
   validate_command
