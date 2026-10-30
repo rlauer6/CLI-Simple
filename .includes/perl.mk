@@ -3,6 +3,7 @@
 PERL_BIN_FILES = $(patsubst %.pl.in,%.pl,$(filter %.pl.in,$(BIN_FILES:%=%.in)))
 
 PERLINCLUDE ?= -I lib -I local/lib/perl5
+SYNTAX_CHECKING ?= on
 
 lint_off  := $(filter off,$(call lc,$(LINT)))
 syntax_on := $(filter-out off,$(call lc,$(SYNTAX_CHECKING)))
@@ -257,8 +258,6 @@ critic: ## run perlcritic on all source files
 lint: ## run all linting tools (tidy + critic)
 	$(NO_ECHO)$(MAKE) tidy critic
 
-ifneq ($(syntax_on),)
-
 include deps.mk
 
 # deps.mk depends on SOURCE (.pm.in), not the built .pm targets.
@@ -272,8 +271,6 @@ deps.mk: $(SOURCE_FILES_IN)
 	$(NO_ECHO)$(BOOTSTRAPPER) create-deps > $@.tmp \
 	  && mv $@.tmp $@ \
 	  || { rm -f $@.tmp; false; }
-
-endif
 
 # custom make rules
 #
